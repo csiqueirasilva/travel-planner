@@ -965,6 +965,21 @@ test('reports clients and top destinations require admin', async () => {
   assert.equal(studentTop.status, 403);
 });
 
+test('reports usage excludes admin logs by default', async () => {
+  // ensure an admin log exists
+  await expectJson('/clients', { token: ADMIN_TOKEN });
+
+  const usageNoAdmin = await expectJson('/reports/usage', { token: ADMIN_TOKEN });
+  assert.ok(Array.isArray(usageNoAdmin));
+  assert.ok(!usageNoAdmin.some((log) => log.matricula === 'admin'), 'default should exclude admin logs');
+
+  const usageWithAdmin = await expectJson('/reports/usage?includeAdmin=true', { token: ADMIN_TOKEN });
+  assert.ok(
+    usageWithAdmin.some((log) => log.matricula === 'admin'),
+    'includeAdmin should return admin logs'
+  );
+});
+
 test('admin-only endpoints block student tokens', async () => {
   const adminOnlyOps = [
     { method: 'POST', path: '/hotels', body: { name: 'Hotel Sem Permissao' } },

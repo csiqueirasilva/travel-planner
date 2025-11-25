@@ -13,6 +13,10 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
 const WS_PORT = process.env.WS_PORT || 3001;
+const ADMIN_MATS = (process.env.ADMIN_MATRICULAS || '0000001,1111111')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
 
 function loadAdminToken() {
   try {
@@ -93,10 +97,10 @@ app.use(async (req, res, next) => {
         },
       });
       const payload = JSON.stringify({ type: 'usage', log });
-      usageSockets.forEach((ws) => {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(payload);
-        }
+      usageSockets.forEach((conn) => {
+        if (conn.ws.readyState !== conn.ws.OPEN) return;
+        if (!conn.includeAdmin && isAdminMat(log.matricula)) return;
+        conn.ws.send(payload);
       });
     } catch (err) {
       // avoid throwing during response finalization
@@ -908,9 +912,22 @@ app.get('/reports/top-destinations', requireAuth, requireAdmin, async (req, res)
 
 app.get('/reports/usage', requireAuth, requireAdmin, async (req, res) => {
   const { matricula } = req.query;
+  const includeAdminParam = (req.query.includeAdmin || '').toLowerCase();
+  const includeAdmin = includeAdminParam === '1' || includeAdminParam === 'true';
   try {
+    let where = matricula ? { matricula: String(matricula) } : undefined;
+    if (!includeAdmin) {
+      const notIn = ['admin', ...ADMIN_MATS];
+      if (where && where.matricula) {
+        if (isAdminMat(where.matricula)) {
+          where = { matricula: '__none__' };
+        }
+      } else {
+        where = { matricula: { notIn } };
+      }
+    }
     const logs = await prisma.usageLog.findMany({
-      where: matricula ? { matricula: String(matricula) } : undefined,
+      where,
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
@@ -951,20 +968,24 @@ console.log(`WebSocket server running on port ${WS_PORT}`);
 wss.on('connection', async (ws, req) => {
   const url = new URL(req.url || '', 'http://localhost');
   const token = url.searchParams.get('adminToken');
+  const includeAdminParam = (url.searchParams.get('includeAdmin') || '').toLowerCase();
+  const includeAdmin = includeAdminParam === '1' || includeAdminParam === 'true';
   if (token !== ADMIN_TOKEN) {
     ws.close(1008, 'Admin token required');
     return;
   }
-  usageSockets.add(ws);
-  ws.on('close', () => usageSockets.delete(ws));
-  ws.on('error', () => usageSockets.delete(ws));
+  const conn = { ws, includeAdmin };
+  usageSockets.add(conn);
+  ws.on('close', () => usageSockets.delete(conn));
+  ws.on('error', () => usageSockets.delete(conn));
 
   try {
     const logs = await prisma.usageLog.findMany({
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    ws.send(JSON.stringify({ type: 'usage:init', logs: logs.reverse() }));
+    const filtered = includeAdmin ? logs : logs.filter((l) => !isAdminMat(l.matricula));
+    ws.send(JSON.stringify({ type: 'usage:init', logs: filtered.reverse() }));
   } catch (err) {
     ws.send(JSON.stringify({ type: 'usage:init', logs: [] }));
   }
@@ -1025,4 +1046,10 @@ function destinationMatchesCity(planeDestination, hotelCity) {
   const cityTokens = tokensForSearch(hotelCity).map((t) => t.toUpperCase());
   if (cityTokens.some((t) => alias.includes(t) || t.includes(alias))) return true;
   return false;
+}
+
+function isAdminMat(matricula) {
+  if (!matricula) return false;
+  const value = String(matricula);
+  return value === 'admin' || ADMIN_MATS.includes(value);
 }
