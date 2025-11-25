@@ -7,6 +7,7 @@ RUN npm install
 
 COPY prisma ./prisma
 COPY src ./src
+COPY mcp ./mcp
 COPY scripts ./scripts
 COPY PRIVACY.md ./PRIVACY.md
 

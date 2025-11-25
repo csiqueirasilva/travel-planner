@@ -46,9 +46,7 @@ npm run dev
 - Auth helper: `POST /auth/login` echoes `Bearer` token for a matricula.
 - Docs: Swagger UI at `/docs` and raw spec at `/openapi.json`.
 - Split OpenAPI specs (<=30 ops each): `/openapi-client.json` (student flows) and `/openapi-admin.json` (admin flows). Swagger UI exposes both in the selector at `/docs`.
-- MCP/OpenAPI: ready-to-use configs live in `.mcp/servers/` for `mcp-openapi`. Set `API_KEY` to your matricula (or the admin token for the admin server). Examples:
-  - `npx -y mcp-openapi serve --spec src/openapi-client.json --name travel-planner-client --base-url https://leiame.app --header "Authorization: 1234567"`
-  - `npx -y mcp-openapi serve --spec src/openapi-admin.json --name travel-planner-admin --base-url https://leiame.app --header "Authorization: 136c0897-1535-45ed-b665-78a544f39e75"`
+- MCP (streamable HTTP): run `npm run mcp` to start the MCP server at `http://localhost:3333/mcp` (configurable via `MCP_PORT`). Set `MCP_BASE_URL` (defaults to `http://localhost:3000`), `MCP_CLIENT_TOKEN` (matricula) and `MCP_ADMIN_TOKEN` (falls back to `ADMIN_TOKEN`). `MCP_ALLOWED_HOSTS="*"` disables host pinning (use bearer matricula/admin tokens for access control). The `.mcp/servers/*.json` entries point at this HTTP endpoint for Claude/Copilot-style hosts. Tools are registered as `client.<operationId>`/`admin.<operationId>` (each with an optional `authorization` override and `body` for JSON requests), and the split OpenAPI specs are exposed as MCP resources.
 
 ## Notes
 - CORS is fully open (`*`) in both Express and the reverse proxy (Caddy).

@@ -9,6 +9,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
     "seed": "node prisma/seed.js",
+    "mcp": "node mcp/app.mjs",
     "test": "echo \"Use npm run test:prod\" && exit 0",
     "test:prod": "node --test tests/prod.test.js"
   },
@@ -17,9 +18,13 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.16.2",
+    "@modelcontextprotocol/sdk": "^1.22.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "axios": "^1.7.7",
+    "zod": "^3.23.8",
+    "node-cache": "^5.1.2",
     "openapi-client-axios": "^7.8.0",
     "ws": "^8.17.1",
     "prisma": "^5.16.2",

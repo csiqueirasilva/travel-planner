@@ -1,6 +1,9 @@
 leiame.app {
   encode gzip
 
+  @mcp path /mcp
+  reverse_proxy @mcp mcp:3333
+
   reverse_proxy /reports/usage/stream api:3001
   reverse_proxy api:3000
 }

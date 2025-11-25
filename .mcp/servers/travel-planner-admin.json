@@ -1,19 +1,6 @@
 {
-  "command": "npx",
-  "args": [
-    "-y",
-    "mcp-openapi",
-    "serve",
-    "--spec",
-    "src/openapi-admin.json",
-    "--name",
-    "travel-planner-admin",
-    "--base-url",
-    "https://leiame.app",
-    "--header",
-    "Authorization: ${API_KEY}"
-  ],
-  "env": {
-    "API_KEY": "136c0897-1535-45ed-b665-78a544f39e75"
-  }
+  "type": "http",
+  "url": "http://localhost:3333/mcp",
+  "name": "travel-planner-mcp-admin",
+  "description": "Same Streamable HTTP MCP server endpoint (admin operations included)"
 }
