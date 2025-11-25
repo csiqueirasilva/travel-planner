@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.1.0",
   "info": {
     "title": "Travel Planner API",
     "version": "1.0.0",
@@ -9,10 +9,6 @@
     {
       "url": "https://leiame.app",
       "description": "Production"
-    },
-    {
-      "url": "http://localhost:3000",
-      "description": "Local dev"
     }
   ],
   "security": [
@@ -278,7 +274,8 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "operationId": "healthCheck"
       }
     },
     "/auth/login": {
@@ -303,7 +300,8 @@
           "200": {
             "description": "Token issued"
           }
-        }
+        },
+        "operationId": "login"
       }
     },
     "/locations": {
@@ -323,7 +321,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "listLocations"
       },
       "post": {
         "summary": "Create location (admin token required)",
@@ -339,7 +338,8 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "operationId": "createLocation"
       }
     },
     "/locations/{id}": {
@@ -362,7 +362,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getLocation"
       },
       "put": {
         "summary": "Update location (admin token required)",
@@ -388,7 +389,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "updateLocation"
       },
       "delete": {
         "summary": "Delete location (admin token required)",
@@ -414,7 +416,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "deleteLocation"
       }
     },
     "/hotels": {
@@ -472,7 +475,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "listHotels"
       },
       "post": {
         "summary": "Create hotel (admin)",
@@ -488,7 +492,8 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "operationId": "createHotel"
       }
     },
     "/hotels/{id}": {
@@ -511,7 +516,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getHotel"
       }
     },
     "/hotels/{id}/availability": {
@@ -545,7 +551,8 @@
           "200": {
             "description": "Availability"
           }
-        }
+        },
+        "operationId": "getHotelAvailability"
       }
     },
     "/hotels/{id}/reviews": {
@@ -575,7 +582,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "listHotelReviews"
       },
       "post": {
         "summary": "Add review for a hotel (matrícula token required)",
@@ -622,7 +630,8 @@
           "401": {
             "description": "Unauthorized"
           }
-        }
+        },
+        "operationId": "createHotelReview"
       }
     },
     "/planes": {
@@ -666,7 +675,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "listPlanes"
       },
       "post": {
         "summary": "Create flight (admin)",
@@ -682,7 +692,8 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "operationId": "createPlane"
       }
     },
     "/planes/search": {
@@ -726,7 +737,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "searchPlanes"
       }
     },
     "/clients": {
@@ -744,7 +756,8 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "operationId": "listClients"
       },
       "post": {
         "summary": "Create client (requires matricula token or admin token)",
@@ -760,7 +773,8 @@
           "401": {
             "description": "Unauthorized"
           }
-        }
+        },
+        "operationId": "createClient"
       }
     },
     "/clients/{matricula}": {
@@ -795,7 +809,8 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "operationId": "getClient"
       }
     },
     "/purchases": {
@@ -813,7 +828,8 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "operationId": "createPurchase"
       }
     },
     "/purchases/{id}": {
@@ -848,7 +864,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getPurchase"
       },
       "put": {
         "summary": "Update purchase (self or admin)",
@@ -874,7 +891,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "updatePurchase"
       },
       "delete": {
         "summary": "Delete purchase (self or admin)",
@@ -900,7 +918,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "deletePurchase"
       }
     },
     "/offers": {
@@ -921,7 +940,8 @@
           "200": {
             "description": "Offers"
           }
-        }
+        },
+        "operationId": "listOffers"
       }
     },
     "/offers/today": {
@@ -931,7 +951,8 @@
           "200": {
             "description": "Offers"
           }
-        }
+        },
+        "operationId": "listTodayOffers"
       }
     },
     "/bookings": {
@@ -946,7 +967,8 @@
           "201": {
             "description": "Created"
           }
-        }
+        },
+        "operationId": "createBooking"
       }
     },
     "/itineraries": {
@@ -961,7 +983,8 @@
           "201": {
             "description": "Created"
           }
-        }
+        },
+        "operationId": "createItinerary"
       }
     },
     "/itineraries/{id}": {
@@ -996,7 +1019,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getItinerary"
       },
       "put": {
         "summary": "Update itinerary (self or admin)",
@@ -1040,7 +1064,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "updateItinerary"
       }
     },
     "/reports/sales": {
@@ -1058,7 +1083,8 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "operationId": "getSalesReport"
       }
     }
   }
