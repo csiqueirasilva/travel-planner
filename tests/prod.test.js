@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
 require('dotenv').config();
 
 const BASE = 'https://leiame.app';
@@ -108,6 +110,20 @@ test('client lifecycle with self-access only', async () => {
   // cleanup
   const del = await expectJson(`/clients/${mat}`, { method: 'DELETE', token: mat });
   assert.equal(del.deleted, true);
+});
+
+test('invalid auth token format returns explicit 401', async () => {
+  const res = await api('/clients', {
+    method: 'POST',
+    token: 'bad-token',
+    body: { matricula: randomMatricula(), name: 'Bad Token', email: 'bad@example.com' },
+  });
+  assert.equal(res.status, 401);
+  const data = await res.json();
+  assert.ok(
+    typeof data.error === 'string' && data.error.toLowerCase().includes('authorization'),
+    'should include auth error detail'
+  );
 });
 
 test('client validation and duplicate protection', async () => {
@@ -383,4 +399,29 @@ test('admin-only endpoints block student tokens', async () => {
 
   const missingAuth = await api('/hotels', { method: 'POST', body: { name: 'Sem Auth' } });
   assert.equal(missingAuth.status, 401, 'admin endpoints should reject missing Authorization header');
+});
+
+test('openapi client schema drives a successful client creation', async () => {
+  const openApiPath = path.join(__dirname, '..', 'src', 'openapi.json');
+  const doc = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
+  const clientPost =
+    doc.paths?.['/clients']?.post?.requestBody?.content?.['application/json']?.schema;
+  assert.ok(clientPost, 'clients POST should define requestBody schema');
+  assert.ok(
+    Array.isArray(clientPost.required) &&
+      clientPost.required.includes('matricula') &&
+      clientPost.required.includes('name') &&
+      clientPost.required.includes('email'),
+    'clients POST schema should require matricula, name, email'
+  );
+
+  const mat = randomMatricula();
+  const body = { matricula: mat, name: 'OpenAPI User', email: `openapi${mat}@example.com` };
+  const created = await expectJson('/clients', { method: 'POST', token: mat, body }, 201);
+  assert.equal(created.matricula, mat);
+
+  const fetched = await expectJson(`/clients/${mat}`, { token: mat });
+  assert.equal(fetched.matricula, mat);
+
+  await expectJson(`/clients/${mat}`, { method: 'DELETE', token: mat });
 });
