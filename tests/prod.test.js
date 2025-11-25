@@ -7,6 +7,11 @@ require('dotenv').config();
 const BASE = 'https://leiame.app';
 const STUDENT_TOKEN = process.env.STUDENT_TOKEN || '1234567';
 const OTHER_TOKEN = process.env.OTHER_TOKEN || randomMatricula(); // used for cross-access tests
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+
+if (!ADMIN_TOKEN) {
+  throw new Error('ADMIN_TOKEN env required to run full API coverage tests');
+}
 
 function randomMatricula() {
   // 7-digit string, avoid leading zero
@@ -50,6 +55,21 @@ async function ensureClientExists(matricula, token = matricula) {
 test('health responds', async () => {
   const data = await expectJson('/health');
   assert.equal(data.status, 'ok');
+});
+
+test('status endpoint responds', async () => {
+  const data = await expectJson('/status');
+  assert.equal(data.status, 'ok');
+});
+
+test('auth login echoes bearer token', async () => {
+  const mat = randomMatricula();
+  const res = await expectJson('/auth/login', {
+    method: 'POST',
+    body: { matricula: mat },
+  });
+  assert.equal(res.token, mat);
+  assert.ok(typeof res.bearer === 'string' && res.bearer.includes(mat));
 });
 
 test('locations and hotels are available with filters', async () => {
@@ -126,6 +146,12 @@ test('invalid auth token format returns explicit 401', async () => {
   );
 });
 
+test('admin can list clients', async () => {
+  const list = await expectJson('/clients', { token: ADMIN_TOKEN });
+  assert.ok(Array.isArray(list), 'admin should list clients');
+  assert.ok(list.some((c) => c.matricula === '1234567'), 'seed student should be present');
+});
+
 test('client validation and duplicate protection', async () => {
   const invalidRes = await api('/clients', {
     method: 'POST',
@@ -198,6 +224,64 @@ test('purchases respect ownership; create, update, delete', async () => {
 
   const deleted = await expectJson(`/purchases/${created.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
   assert.equal(deleted.deleted, true);
+});
+
+test('admin CRUD for locations, hotels, planes and sales report', async () => {
+  const locBody = { name: 'Loc Admin Test', city: 'Test City', country: 'TC' };
+  const location = await expectJson('/locations', { method: 'POST', token: ADMIN_TOKEN, body: locBody }, 201);
+  assert.ok(location.id);
+
+  const locData = await expectJson(`/locations/${location.id}`);
+  assert.equal(locData.id, location.id);
+
+  const updatedLoc = await expectJson(`/locations/${location.id}`, {
+    method: 'PUT',
+    token: ADMIN_TOKEN,
+    body: { name: 'Loc Admin Test Updated' },
+  });
+  assert.equal(updatedLoc.name, 'Loc Admin Test Updated');
+
+  const hotelBody = {
+    name: 'Admin Hotel Test',
+    city: 'Test City',
+    country: 'TC',
+    price: 100,
+    stars: 3,
+    amenities: ['wifi'],
+    locationId: location.id,
+  };
+  const hotel = await expectJson('/hotels', { method: 'POST', token: ADMIN_TOKEN, body: hotelBody }, 201);
+  assert.ok(hotel.id);
+
+  const hotelData = await expectJson(`/hotels/${hotel.id}`);
+  assert.equal(hotelData.id, hotel.id);
+
+  const availability = await expectJson(`/hotels/${hotel.id}/availability`);
+  assert.equal(availability.hotelId, hotel.id);
+
+  const planeBody = {
+    code: `AD${Date.now()}`.slice(0, 8),
+    origin: 'AAA',
+    destination: 'BBB',
+    departure: '2030-01-01T10:00:00Z',
+    arrival: '2030-01-01T12:00:00Z',
+    price: 50,
+  };
+  const plane = await expectJson('/planes', { method: 'POST', token: ADMIN_TOKEN, body: planeBody }, 201);
+  assert.ok(plane.id);
+
+  const planeData = await expectJson(`/planes/${plane.id}`);
+  assert.equal(planeData.id, plane.id);
+
+  const search = await expectJson(`/planes/search?origin=${planeBody.origin}&destination=${planeBody.destination}`);
+  assert.ok(search.some((p) => p.id === plane.id));
+
+  const report = await expectJson('/reports/sales', { token: ADMIN_TOKEN });
+  assert.ok(report && typeof report === 'object');
+
+  await expectJson(`/planes/${plane.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
+  await expectJson(`/hotels/${hotel.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
+  await expectJson(`/locations/${location.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
 });
 
 test('itinerary with booking linkage and cleanup', async () => {
@@ -316,9 +400,7 @@ test('double delete on purchases returns 404 after first removal', async () => {
   await expectStatus(`/purchases/${created.id}`, { method: 'DELETE', token: STUDENT_TOKEN }, 404);
 });
 
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
-
-test('admin-only endpoints allow admin token end-to-end', { skip: !ADMIN_TOKEN }, async () => {
+test('admin-only endpoints allow admin token end-to-end', async () => {
   const suffix = Date.now();
   const location = await expectJson('/locations', {
     method: 'POST',
@@ -414,6 +496,15 @@ test('openapi client schema drives a successful client creation', async () => {
       clientPost.required.includes('email'),
     'clients POST schema should require matricula, name, email'
   );
+
+  // ensure all operations have operationId
+  Object.entries(doc.paths || {}).forEach(([p, methods]) => {
+    Object.entries(methods || {}).forEach(([m, cfg]) => {
+      if (cfg && typeof cfg === 'object') {
+        assert.ok(cfg.operationId, `operationId missing for ${m.toUpperCase()} ${p}`);
+      }
+    });
+  });
 
   const mat = randomMatricula();
   const body = { matricula: mat, name: 'OpenAPI User', email: `openapi${mat}@example.com` };
