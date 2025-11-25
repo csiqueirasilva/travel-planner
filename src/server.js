@@ -138,6 +138,23 @@ function pickClientPayload(body) {
   return payload;
 }
 
+function parseDateSafe(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function validateDateRange(checkInRaw, checkOutRaw) {
+  const checkIn = parseDateSafe(checkInRaw);
+  const checkOut = parseDateSafe(checkOutRaw);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (checkIn && checkIn < today) return { error: 'checkIn must be today or a future date' };
+  if (checkOut && checkOut < today) return { error: 'checkOut must be today or a future date' };
+  if (checkIn && checkOut && checkOut <= checkIn) return { error: 'checkOut must be after checkIn' };
+  return { checkIn, checkOut };
+}
+
 // Hotels
 app.get('/hotels', async (req, res) => {
   const { city, priceMin, priceMax, stars, amenities } = req.query;
@@ -254,11 +271,28 @@ app.get('/hotels/:id/availability', async (req, res) => {
     include: { roomTypes: true },
   });
   if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
-  const rooms = hotel.roomTypes.map((room) => ({
-    roomType: room.name,
-    price: room.price,
-    available: room.available,
-  }));
+  const startDate = parseDateSafe(req.query.startDate);
+  const endDate = parseDateSafe(req.query.endDate);
+  let bookingsOverlap = 0;
+  if (startDate || endDate) {
+    bookingsOverlap = await prisma.booking.count({
+      where: {
+        hotelId: id,
+        AND: [
+          startDate ? { checkOut: { gte: startDate } } : {},
+          endDate ? { checkIn: { lte: endDate } } : {},
+        ],
+      },
+    });
+  }
+  const rooms = hotel.roomTypes.map((room) => {
+    const available = Math.max((room.available ?? 0) - bookingsOverlap, 0);
+    return {
+      roomType: room.name,
+      price: room.price,
+      available,
+    };
+  });
   res.json({
     hotelId: id,
     startDate: req.query.startDate || null,
@@ -466,13 +500,15 @@ app.post('/purchases', requireAuth, async (req, res) => {
     guests = 1,
   } = req.body;
   if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
+  const dateValidation = validateDateRange(checkIn, checkOut);
+  if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   const purchase = await prisma.purchase.create({
     data: {
       clientMatricula,
       hotelId,
       planeId,
-      checkIn: checkIn ? new Date(checkIn) : null,
-      checkOut: checkOut ? new Date(checkOut) : null,
+      checkIn: dateValidation.checkIn,
+      checkOut: dateValidation.checkOut,
       totalAmount,
       guests,
     },
@@ -495,13 +531,15 @@ app.put('/purchases/:id', requireAuth, async (req, res) => {
   const existing = await prisma.purchase.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Purchase not found' });
   if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
+  const dateValidation = validateDateRange(req.body.checkIn, req.body.checkOut);
+  if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   const purchase = await prisma.purchase.update({
     where: { id },
     data: {
       hotelId: req.body.hotelId,
       planeId: req.body.planeId,
-      checkIn: req.body.checkIn ? new Date(req.body.checkIn) : null,
-      checkOut: req.body.checkOut ? new Date(req.body.checkOut) : null,
+      checkIn: dateValidation.checkIn,
+      checkOut: dateValidation.checkOut,
       totalAmount: req.body.totalAmount,
       guests: req.body.guests,
     },
@@ -604,6 +642,8 @@ app.post('/bookings', requireAuth, async (req, res) => {
     totalAmount,
   } = req.body;
   if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
+  const dateValidation = validateDateRange(checkIn, checkOut);
+  if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   const booking = await prisma.booking.create({
     data: {
       clientMatricula,
@@ -611,8 +651,8 @@ app.post('/bookings', requireAuth, async (req, res) => {
       planeId,
       itineraryId,
       status: status || 'CONFIRMED',
-      checkIn: checkIn ? new Date(checkIn) : null,
-      checkOut: checkOut ? new Date(checkOut) : null,
+      checkIn: dateValidation.checkIn,
+      checkOut: dateValidation.checkOut,
       totalAmount,
     },
   });
@@ -634,6 +674,8 @@ app.put('/bookings/:id', requireAuth, async (req, res) => {
   const existing = await prisma.booking.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Booking not found' });
   if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
+  const dateValidation = validateDateRange(req.body.checkIn, req.body.checkOut);
+  if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   const booking = await prisma.booking.update({
     where: { id },
     data: {
@@ -641,8 +683,8 @@ app.put('/bookings/:id', requireAuth, async (req, res) => {
       planeId: req.body.planeId,
       itineraryId: req.body.itineraryId,
       status: req.body.status,
-      checkIn: req.body.checkIn ? new Date(req.body.checkIn) : null,
-      checkOut: req.body.checkOut ? new Date(req.body.checkOut) : null,
+      checkIn: dateValidation.checkIn,
+      checkOut: dateValidation.checkOut,
       totalAmount: req.body.totalAmount,
     },
   });

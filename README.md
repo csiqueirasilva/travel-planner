@@ -23,7 +23,7 @@ npm run dev
 ```
 
 ## Tests
-- The suite has 33 Node test cases covering positive/negative paths against the OpenAPI spec.
+- The suite has 34 Node test cases covering positive/negative paths against the OpenAPI spec.
 - Ensure the API is running and `.env` includes `BASE_URL` (pointing at the running API) and `ADMIN_TOKEN`; `STUDENT_TOKEN`/`OTHER_TOKEN` can be set to override the defaults used in tests.
 - Run: `npm run test:prod` (loads env via dotenv automatically).
 

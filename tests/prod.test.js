@@ -254,8 +254,8 @@ test('purchases respect ownership; create, update, delete', async () => {
     clientMatricula: STUDENT_TOKEN,
     hotelId: 1,
     planeId: 1,
-    checkIn: '2025-12-01',
-    checkOut: '2025-12-05',
+    checkIn: '2030-12-01',
+    checkOut: '2030-12-05',
     guests: 2,
     totalAmount: 1200,
   };
@@ -293,6 +293,36 @@ test('purchases respect ownership; create, update, delete', async () => {
 
   const deleted = await expectJson(`/purchases/${created.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
   assert.equal(deleted.deleted, true);
+});
+
+test('purchases and bookings reject past dates and invalid ranges', async () => {
+  await ensureClientExists(STUDENT_TOKEN);
+  const pastPurchase = await api('/purchases', {
+    method: 'POST',
+    token: STUDENT_TOKEN,
+    body: {
+      clientMatricula: STUDENT_TOKEN,
+      hotelId: 1,
+      planeId: 1,
+      checkIn: '2000-01-01',
+      checkOut: '2000-01-05',
+      totalAmount: 100,
+    },
+  });
+  assert.equal(pastPurchase.status, 400, 'should reject purchases in the past');
+
+  const badRangeBooking = await api('/bookings', {
+    method: 'POST',
+    token: STUDENT_TOKEN,
+    body: {
+      clientMatricula: STUDENT_TOKEN,
+      hotelId: 1,
+      checkIn: '2030-01-05',
+      checkOut: '2030-01-01',
+      totalAmount: 100,
+    },
+  });
+  assert.equal(badRangeBooking.status, 400, 'should reject bookings with checkOut before checkIn');
 });
 
 test('admin CRUD for locations, hotels, planes and sales report', async () => {
