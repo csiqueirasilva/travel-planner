@@ -1,3 +1,93 @@
+# Contexto do banco de dados (visível para estudantes)
+
+```mermaid
+classDiagram
+  class Client {
+    +String matricula (PK)
+    +String name
+    +String email
+    +Role role
+    +Boolean active
+    +String createdBy
+  }
+  class Purchase {
+    +Int id (PK)
+    +String clientMatricula (FK)
+    +Int? hotelId (FK)
+    +Int? planeId (FK)
+    +DateTime? checkIn
+    +DateTime? checkOut
+    +Float totalAmount
+    +Int guests
+    +String createdBy
+  }
+  class Booking {
+    +Int id (PK)
+    +String clientMatricula (FK)
+    +Int? hotelId (FK)
+    +Int? planeId (FK)
+    +Int? itineraryId (FK)
+    +String status
+    +DateTime? checkIn
+    +DateTime? checkOut
+    +Float? totalAmount
+    +String createdBy
+  }
+  class Itinerary {
+    +Int id (PK)
+    +String name
+    +String clientMatricula (FK)
+    +String? notes
+    +String createdBy
+  }
+  class Hotel {
+    +Int id (PK)
+    +String name
+    +String city
+    +String country
+    +Int price
+    +Int stars
+    +Int locationId (FK)
+  }
+  class RoomType {
+    +Int id (PK)
+    +Int hotelId (FK)
+    +String name
+    +Int price
+    +Int available
+  }
+  class Location {
+    +Int id (PK)
+    +String name
+    +String city
+    +String country
+  }
+  class Plane {
+    +Int id (PK)
+    +String code
+    +String origin
+    +String destination
+    +DateTime departure
+    +DateTime arrival
+    +Int price
+  }
+  Client "1" --> "0..*" Purchase : compra
+  Client "1" --> "0..*" Booking : reserva
+  Client "1" --> "0..*" Itinerary : itinerario
+  Purchase "0..1" --> "1" Hotel : hotel
+  Purchase "0..1" --> "1" Plane : voo
+  Booking "0..1" --> "1" Hotel : hotel
+  Booking "0..1" --> "1" Plane : voo
+  Booking "0..1" --> "1" Itinerary : itinerario
+  Hotel "1" --> "1..*" RoomType : tipos de quarto
+  Hotel "many" --> "1" Location : pertence a
+```
+
+- **Voos**: o banco já vem pré-carregado com ~43.8 mil voos (10 por dia para cada uma das 6 rotas principais, cobrindo 2 anos a partir de hoje). As buscas por origem/destino devem encontrar resultados imediatamente.
+- **Hotéis**: existem 5 hotéis cadastrados no ambiente de produção (`leiame.app`), suficientes para os exercícios de seleção, compra, avaliação e reservas.
+- **Locais**: existem 5 localidades cadastradas, referenciadas pelos hotéis e usadas nas buscas de destinos.
+- **Importante**: as tarefas abaixo permanecem exatamente as mesmas; use os dados acima como referência para explorar, criar compras/reservas e validar os exercícios.
+
 # Tarefas a serem executadas (PT-BR)
 
 1) **Criar seu cadastro (cliente)**  
