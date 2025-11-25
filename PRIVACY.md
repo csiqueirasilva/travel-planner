@@ -12,7 +12,7 @@ Travel Planner API (“Serviço”, “nós”) é uma API de demonstração/tre
 - Dados técnicos: endereço IP e user-agent enviados pelo cliente HTTP.
 
 ## Finalidades e bases legais
-- Operar a API e permitir exercícios de CRUD e buscas (execução de contrato/legítimo interesse).
+- Operar a API e permitir exercícios de CRUD e buscas para simulações em aula do professor Gustavo Moreira (execução de contrato/legítimo interesse).
 - Segurança, auditoria e prevenção de abuso (legítimo interesse).
 - Suporte e depuração técnica (legítimo interesse).
 
@@ -21,8 +21,8 @@ Travel Planner API (“Serviço”, “nós”) é uma API de demonstração/tre
 - Não vendemos dados e não compartilhamos com terceiros para marketing.
 
 ## Retenção
-- Dados de negócios (clientes, compras, bookings etc.) permanecem até limpeza manual ou redefinição do ambiente de aula.
-- Logs de uso podem ser rotacionados periodicamente; podem ser apagados ao reset do ambiente.
+- Dados de negócios (clientes, compras, bookings etc.) são apenas simulados e descartados ao final do período/semestre ou quando o ambiente de aula é redefinido.
+- Logs de uso podem ser rotacionados periodicamente; são removidos no reset do ambiente.
 
 ## Segurança
 - Controle de acesso por token (matrícula ou token de admin).
@@ -47,4 +47,4 @@ Travel Planner API (“Serviço”, “nós”) é uma API de demonstração/tre
 - Podemos atualizar esta política; a data de “Última atualização” será ajustada e a nova versão publicada no repositório/endpoint público.
 
 ## Contato
-- Dúvidas ou solicitações de privacidade: `privacidade@leiame.app`
+- Dúvidas ou solicitações de privacidade: `gmoreira@puc-rio.br`
