@@ -22,6 +22,11 @@ npm run seed
 npm run dev
 ```
 
+## Tests
+- The suite has 31 Node test cases covering positive/negative paths against the OpenAPI spec.
+- Ensure the API is running and `.env` includes `BASE_URL` (pointing at the running API) and `ADMIN_TOKEN`; `STUDENT_TOKEN`/`OTHER_TOKEN` can be set to override the defaults used in tests.
+- Run: `npm run test:prod` (loads env via dotenv automatically).
+
 ## Auth
 - Send `Authorization: 1234567` (7 digits) for student requests. For admin-only routes, send the admin token configured via `ADMIN_TOKEN` in `.env` or `config/admin.json`.
 - Config: copy `config/admin.example.json` to `config/admin.json` and set a strong `adminToken` (this file is git-ignored). The server also reads `ADMIN_MATRICULAS` from env for legacy admin matriculas and falls back to `ADMIN_TOKEN` for admin access.

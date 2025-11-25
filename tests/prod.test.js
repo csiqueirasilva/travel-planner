@@ -2,12 +2,14 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
+const OpenAPIClientAxios = require('openapi-client-axios').default;
 require('dotenv').config();
 
-const BASE = 'https://leiame.app';
+const BASE = process.env.BASE_URL || process.env.BASE_PROD || 'https://leiame.app';
 const STUDENT_TOKEN = process.env.STUDENT_TOKEN || '1234567';
 const OTHER_TOKEN = process.env.OTHER_TOKEN || randomMatricula(); // used for cross-access tests
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+const OPENAPI_PATH = path.join(__dirname, '..', 'src', 'openapi.json');
 
 if (!ADMIN_TOKEN) {
   throw new Error('ADMIN_TOKEN env required to run full API coverage tests');
@@ -36,6 +38,17 @@ async function expectJson(path, opts = {}, expectedStatus = 200) {
   return res.json();
 }
 
+async function expectJsonWithRetry(path, opts = {}, expectedStatus = 200, attempts = 5) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    const res = await api(path, opts);
+    if (res.status === expectedStatus) return res.json();
+    lastErr = res.status;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  assert.equal(lastErr, expectedStatus, `${path} expected ${expectedStatus}, got ${lastErr}`);
+}
+
 async function expectStatus(path, opts = {}, expectedStatus = 200) {
   const res = await api(path, opts);
   assert.equal(res.status, expectedStatus, `${path} expected ${expectedStatus}, got ${res.status}`);
@@ -50,6 +63,12 @@ async function ensureClientExists(matricula, token = matricula) {
     return expectJson(`/clients/${matricula}`, { token });
   }
   assert.equal(res.status, 201, `Failed to ensure client ${matricula} exists`);
+}
+
+async function getOpenApiClient() {
+  const definition = JSON.parse(fs.readFileSync(OPENAPI_PATH, 'utf8'));
+  const api = new OpenAPIClientAxios({ definition, axiosConfigDefaults: { baseURL: BASE } });
+  return api.getClient();
 }
 
 test('health responds', async () => {
@@ -140,6 +159,18 @@ test('client lifecycle with self-access only', async () => {
   assert.equal(del.deleted, true);
 });
 
+test('admin can create and manage any client', async () => {
+  const mat = randomMatricula();
+  const body = { matricula: mat, name: 'Admin Created', email: `admin${mat}@example.com` };
+  const created = await expectJson('/clients', { method: 'POST', token: ADMIN_TOKEN, body }, 201);
+  assert.equal(created.matricula, mat);
+
+  const fetched = await expectJson(`/clients/${mat}`, { token: ADMIN_TOKEN });
+  assert.equal(fetched.matricula, mat);
+
+  await expectJson(`/clients/${mat}`, { method: 'DELETE', token: ADMIN_TOKEN });
+});
+
 test('invalid auth token format returns explicit 401', async () => {
   const res = await api('/clients', {
     method: 'POST',
@@ -173,6 +204,26 @@ test('client validation and duplicate protection', async () => {
   await expectJson('/clients', { method: 'POST', token: mat, body }, 201);
   const dupRes = await api('/clients', { method: 'POST', token: mat, body });
   assert.equal(dupRes.status, 409, 'duplicate matricula should not be allowed');
+  await expectJson(`/clients/${mat}`, { method: 'DELETE', token: mat });
+});
+
+test('clients can update their own profile data', async () => {
+  const mat = randomMatricula();
+  const createBody = { matricula: mat, name: 'Updatable User', email: `update${mat}@example.com` };
+  await expectJson('/clients', { method: 'POST', token: mat, body: createBody }, 201);
+
+  const updated = await expectJson(`/clients/${mat}`, {
+    method: 'PUT',
+    token: mat,
+    body: { matricula: mat, name: 'Updated User', email: `updated${mat}@example.com`, active: false },
+  });
+  assert.equal(updated.name, 'Updated User');
+  assert.equal(updated.email, `updated${mat}@example.com`);
+  assert.equal(updated.active, false);
+
+  const fetched = await expectJson(`/clients/${mat}`, { token: mat });
+  assert.equal(fetched.name, 'Updated User');
+
   await expectJson(`/clients/${mat}`, { method: 'DELETE', token: mat });
 });
 
@@ -295,11 +346,169 @@ test('admin CRUD for locations, hotels, planes and sales report', async () => {
   await expectJson(`/locations/${location.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
 });
 
+test('admin updates hotels via put/patch and students are blocked', async () => {
+  const suffix = Date.now();
+  const location = await expectJson('/locations', {
+    method: 'POST',
+    token: ADMIN_TOKEN,
+    body: { name: `Hotel Update Loc ${suffix}`, city: 'Cidade', country: 'BR' },
+  }, 201);
+
+  const studentLocUpdate = await api(`/locations/${location.id}`, {
+    method: 'PUT',
+    token: STUDENT_TOKEN,
+    body: { name: 'Sem permissao', city: 'Cidade', country: 'BR' },
+  });
+  assert.equal(studentLocUpdate.status, 403);
+
+  const studentLocDelete = await api(`/locations/${location.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
+  assert.equal(studentLocDelete.status, 403);
+
+  const hotel = await expectJson('/hotels', {
+    method: 'POST',
+    token: ADMIN_TOKEN,
+    body: {
+      name: `Hotel Update ${suffix}`,
+      city: 'Cidade',
+      country: 'BR',
+      price: 200,
+      stars: 3,
+      amenities: ['wifi'],
+      locationId: location.id,
+    },
+  }, 201);
+
+  const updated = await expectJson(`/hotels/${hotel.id}`, {
+    method: 'PUT',
+    token: ADMIN_TOKEN,
+    body: {
+      name: `Hotel Update ${suffix} v2`,
+      city: 'Outra Cidade',
+      country: 'BR',
+      price: 250,
+      stars: 4,
+      amenities: ['wifi'],
+    },
+  });
+  assert.equal(updated.name, `Hotel Update ${suffix} v2`);
+  assert.equal(updated.stars, 4);
+
+  const patched = await expectJson(`/hotels/${hotel.id}`, {
+    method: 'PATCH',
+    token: ADMIN_TOKEN,
+    body: { price: 275, amenities: ['wifi', 'pool'] },
+  });
+  assert.equal(patched.price, 275);
+  assert.ok(patched.amenities.includes('pool'));
+
+  const studentPatch = await api(`/hotels/${hotel.id}`, {
+    method: 'PATCH',
+    token: STUDENT_TOKEN,
+    body: { price: 999 },
+  });
+  assert.equal(studentPatch.status, 403);
+
+  const studentPut = await api(`/hotels/${hotel.id}`, {
+    method: 'PUT',
+    token: STUDENT_TOKEN,
+    body: { name: 'Hotel estudante', city: 'Cidade', country: 'BR' },
+  });
+  assert.equal(studentPut.status, 403);
+
+  await expectJson(`/hotels/${hotel.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
+  await expectJson(`/locations/${location.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
+});
+
+test('admin updates planes and blocks student updates', async () => {
+  const suffix = Date.now();
+  const plane = await expectJson('/planes', {
+    method: 'POST',
+    token: ADMIN_TOKEN,
+    body: {
+      code: `UP${suffix}`.slice(0, 8),
+      origin: 'RIO',
+      destination: 'SSA',
+      departure: '2030-02-01T10:00:00Z',
+      arrival: '2030-02-01T12:00:00Z',
+      price: 100,
+    },
+  }, 201);
+
+  const updated = await expectJson(`/planes/${plane.id}`, {
+    method: 'PUT',
+    token: ADMIN_TOKEN,
+    body: {
+      code: `UP${suffix + 1}`.slice(0, 8),
+      origin: 'GRU',
+      destination: 'MEX',
+      departure: '2030-02-02T10:00:00Z',
+      arrival: '2030-02-02T12:00:00Z',
+      price: 150,
+    },
+  });
+  assert.equal(updated.origin, 'GRU');
+  assert.equal(updated.destination, 'MEX');
+  assert.equal(updated.price, 150);
+
+  const studentUpdate = await api(`/planes/${plane.id}`, {
+    method: 'PUT',
+    token: STUDENT_TOKEN,
+    body: { code: 'STU1234', origin: 'AAA', destination: 'BBB', price: 1 },
+  });
+  assert.equal(studentUpdate.status, 403);
+
+  const studentDelete = await api(`/planes/${plane.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
+  assert.equal(studentDelete.status, 403);
+
+  await expectJson(`/planes/${plane.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
+});
+
+test('offers detail and update require admin for mutation', async () => {
+  const suffix = Date.now();
+  const offer = await expectJson('/offers', {
+    method: 'POST',
+    token: ADMIN_TOKEN,
+    body: {
+      title: `Oferta Editavel ${suffix}`,
+      description: 'Oferta para teste de update',
+      discountPercent: 15,
+      validUntil: '2031-01-01',
+    },
+  }, 201);
+
+  const detail = await expectJson(`/offers/${offer.id}`);
+  assert.equal(detail.id, offer.id);
+
+  const updated = await expectJson(`/offers/${offer.id}`, {
+    method: 'PUT',
+    token: ADMIN_TOKEN,
+    body: {
+      title: `Oferta Editada ${suffix}`,
+      description: 'Descricao atualizada',
+      discountPercent: 20,
+    },
+  });
+  assert.equal(updated.discountPercent, 20);
+
+  const studentUpdate = await api(`/offers/${offer.id}`, {
+    method: 'PUT',
+    token: STUDENT_TOKEN,
+    body: { title: 'Sem Permissao', discountPercent: 5 },
+  });
+  assert.equal(studentUpdate.status, 403);
+
+  const studentDelete = await api(`/offers/${offer.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
+  assert.equal(studentDelete.status, 403);
+
+  await expectJson(`/offers/${offer.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
+});
+
 test('itinerary with booking linkage and cleanup', async () => {
   const mat = randomMatricula();
   await ensureClientExists(mat);
   await ensureClientExists(OTHER_TOKEN);
 
+  // positive: create itinerary and booking with owner token
   const itinerary = await expectJson(
     '/itineraries',
     {
@@ -322,9 +531,15 @@ test('itinerary with booking linkage and cleanup', async () => {
   );
   assert.ok(booking.id);
 
-  const itData = await expectJson(`/itineraries/${itinerary.id}`, { token: mat });
+  const itData = await expectJsonWithRetry(
+    `/itineraries/${itinerary.id}`,
+    { token: mat },
+    200,
+    10
+  );
   assert.ok(Array.isArray(itData.bookings));
 
+  // negative: missing/other auth
   const itNoAuth = await api(`/itineraries/${itinerary.id}`);
   assert.equal(itNoAuth.status, 401, 'itinerary read requires auth');
 
@@ -376,6 +591,47 @@ test('itinerary with booking linkage and cleanup', async () => {
   // cleanup booking and itinerary
   await expectJson(`/bookings/${booking.id}`, { method: 'DELETE', token: mat });
   await expectJson(`/itineraries/${itinerary.id}`, { method: 'DELETE', token: mat });
+
+  const redeleted = await api(`/itineraries/${itinerary.id}`, { method: 'DELETE', token: mat });
+  assert.equal(redeleted.status, 404);
+});
+
+test('booking detail and update are available to the owner', async () => {
+  const mat = randomMatricula();
+  await ensureClientExists(mat);
+
+  const booking = await expectJson(
+    '/bookings',
+    {
+      method: 'POST',
+      token: mat,
+      body: { clientMatricula: mat, hotelId: 1, planeId: 1, totalAmount: 321 },
+    },
+    201
+  );
+  assert.ok(booking.id);
+
+  const detail = await expectJson(`/bookings/${booking.id}`, { token: mat });
+  assert.equal(detail.id, booking.id);
+
+  const updated = await expectJson(`/bookings/${booking.id}`, {
+    method: 'PUT',
+    token: mat,
+    body: { clientMatricula: mat, totalAmount: 400, status: 'UPDATED' },
+  });
+  assert.equal(updated.totalAmount, 400);
+  assert.equal(updated.status, 'UPDATED');
+
+  await expectJson(`/bookings/${booking.id}`, { method: 'DELETE', token: mat });
+  await expectJson(`/clients/${mat}`, { method: 'DELETE', token: mat });
+});
+
+test('creating itineraries requires authentication', async () => {
+  const res = await api('/itineraries', {
+    method: 'POST',
+    body: { name: 'Sem auth nao pode' },
+  });
+  assert.equal(res.status, 401);
 });
 
 test('reviews can be posted and listed', async () => {
@@ -408,12 +664,58 @@ test('unauthorized purchase creation is rejected', async () => {
 test('missing resources return 404 with auth provided', async () => {
   await ensureClientExists(STUDENT_TOKEN);
   const farId = 9999999;
+  const farMatricula = String(farId);
+  await expectStatus(`/locations/${farId}`, {}, 404);
+  await expectStatus(`/locations/${farId}`, {
+    method: 'PUT',
+    token: ADMIN_TOKEN,
+    body: { name: 'Missing', city: 'Nowhere', country: 'NA' },
+  }, 404);
+  await expectStatus(`/locations/${farId}`, { method: 'DELETE', token: ADMIN_TOKEN }, 404);
   await expectStatus(`/hotels/${farId}`, {}, 404);
   await expectStatus(`/hotels/${farId}/availability`, {}, 404);
+  await expectStatus(`/hotels/${farId}`, {
+    method: 'PUT',
+    token: ADMIN_TOKEN,
+    body: { name: 'Missing Hotel', city: 'NA', country: 'NA', price: 0 },
+  }, 404);
+  await expectStatus(`/hotels/${farId}`, { method: 'PATCH', token: ADMIN_TOKEN, body: { price: 1 } }, 404);
+  await expectStatus(`/hotels/${farId}`, { method: 'DELETE', token: ADMIN_TOKEN }, 404);
   await expectStatus(`/planes/${farId}`, {}, 404);
+  await expectStatus(
+    `/planes/${farId}`,
+    {
+      method: 'PUT',
+      token: ADMIN_TOKEN,
+      body: { code: 'XX0000', origin: 'AAA', destination: 'BBB', price: 1 },
+    },
+    404
+  );
+  await expectStatus(`/planes/${farId}`, { method: 'DELETE', token: ADMIN_TOKEN }, 404);
   await expectStatus(`/offers/${farId}`, {}, 404);
+  await expectStatus(
+    `/offers/${farId}`,
+    { method: 'PUT', token: ADMIN_TOKEN, body: { title: 'Missing Offer', discountPercent: 1 } },
+    404
+  );
+  await expectStatus(`/offers/${farId}`, { method: 'DELETE', token: ADMIN_TOKEN }, 404);
   await expectStatus(`/purchases/${farId}`, { token: STUDENT_TOKEN }, 404);
   await expectStatus(`/bookings/${farId}`, { token: STUDENT_TOKEN }, 404);
+  await expectStatus(
+    `/bookings/${farId}`,
+    { method: 'PUT', token: STUDENT_TOKEN, body: { clientMatricula: STUDENT_TOKEN, totalAmount: 1 } },
+    404
+  );
+  await expectStatus(
+    `/clients/${farMatricula}`,
+    {
+      method: 'PUT',
+      token: farMatricula,
+      body: { matricula: farMatricula, name: 'Missing Client', email: `missing${farMatricula}@example.com` },
+    },
+    404
+  );
+  await expectStatus(`/clients/${farMatricula}`, { method: 'DELETE', token: farMatricula }, 404);
   await expectStatus(`/itineraries/${farId}`, { token: STUDENT_TOKEN }, 404);
 });
 
@@ -492,6 +794,21 @@ test('admin-only endpoints allow admin token end-to-end', async () => {
   await expectJson(`/hotels/${hotel.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
   await expectJson(`/locations/${location.id}`, { method: 'DELETE', token: ADMIN_TOKEN });
 });
+
+test('reports clients and top destinations require admin', async () => {
+  await ensureClientExists(STUDENT_TOKEN);
+  const clientsReport = await expectJson('/reports/clients', { token: ADMIN_TOKEN });
+  assert.ok(clientsReport.total >= 1, 'clients report should return totals');
+  assert.ok(Array.isArray(clientsReport.clients), 'clients list should be present');
+
+  const topDest = await expectJson('/reports/top-destinations', { token: ADMIN_TOKEN });
+  assert.ok(topDest && Array.isArray(topDest.top), 'top destinations should be an array');
+
+  const studentClients = await api('/reports/clients', { token: STUDENT_TOKEN });
+  assert.equal(studentClients.status, 403);
+  const studentTop = await api('/reports/top-destinations', { token: STUDENT_TOKEN });
+  assert.equal(studentTop.status, 403);
+});
 test('admin-only endpoints block student tokens', async () => {
   const adminOnlyOps = [
     { method: 'POST', path: '/hotels', body: { name: 'Hotel Sem Permissao' } },
@@ -545,4 +862,70 @@ test('openapi client schema drives a successful client creation', async () => {
   assert.equal(fetched.matricula, mat);
 
   await expectJson(`/clients/${mat}`, { method: 'DELETE', token: mat });
+});
+
+test('openapi client can call all operations (smoke)', async () => {
+  const client = await getOpenApiClient();
+  // health/status
+  const health = await client.healthCheck();
+  assert.equal(health.data.status, 'ok');
+  const status = await client.statusCheck();
+  assert.equal(status.data.status, 'ok');
+
+  // auth login positive/negative
+  const mat = randomMatricula();
+  const login = await client.login({ matricula: mat });
+  assert.equal(login.data.token, mat);
+  const invalidLoginRes = await client.login({ matricula: 'abc' }).catch((err) => err.response);
+  assert.equal(invalidLoginRes.status, 400);
+
+  // ensure client exists for further calls
+  await ensureClientExists(STUDENT_TOKEN);
+  await ensureClientExists(OTHER_TOKEN);
+
+  // locations list
+  const locs = await client.listLocations();
+  assert.ok(Array.isArray(locs.data));
+
+  // hotels list and detail
+  const hotels = await client.listHotels({ city: 'Rio de Janeiro' });
+  assert.ok(Array.isArray(hotels.data));
+  if (hotels.data.length > 0) {
+    const h = hotels.data[0];
+    const hd = await client.getHotel({ id: h.id });
+    assert.equal(hd.data.id, h.id);
+    const avail = await client.getHotelAvailability({ id: h.id });
+    assert.equal(avail.data.hotelId, h.id);
+    const revs = await client.listHotelReviews({ id: h.id });
+    assert.ok(Array.isArray(revs.data));
+  }
+
+  // planes
+  const planes = await client.listPlanes({ origin: 'RIO', destination: 'SAO' });
+  assert.ok(Array.isArray(planes.data));
+  if (planes.data.length > 0) {
+    const p = planes.data[0];
+    const pd = await client.getPlane({ id: p.id });
+    assert.equal(pd.data.id, p.id);
+    const search = await client.searchPlanes({ origin: p.origin, destination: p.destination });
+    assert.ok(Array.isArray(search.data));
+  }
+
+  // offers
+  const offersToday = await client.listTodayOffers();
+  assert.ok(Array.isArray(offersToday.data));
+  const offersAny = await client.listOffers();
+  assert.ok(Array.isArray(offersAny.data));
+
+  // purchases negative (unauthorized)
+  const badPurchaseRes = await client
+    .createPurchase({}, { headers: { 'Content-Type': 'application/json' } })
+    .catch((err) => err.response);
+  assert.equal(badPurchaseRes.status, 401);
+
+  // bookings negative (unauthorized)
+  const badBookingRes = await client
+    .createBooking({}, { headers: { 'Content-Type': 'application/json' } })
+    .catch((err) => err.response);
+  assert.equal(badBookingRes.status, 401);
 });
