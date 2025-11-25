@@ -74,6 +74,7 @@ model Client {
   email        String
   role         Role        @default(STUDENT)
   active       Boolean     @default(true)
+  createdBy    String?
   purchases    Purchase[]
   reviews      Review[]
   bookings     Booking[]
@@ -92,8 +93,9 @@ model Purchase {
   planeId         Int?
   checkIn         DateTime?
   checkOut        DateTime?
-  totalAmount     Int
+  totalAmount     Float
   guests          Int?      @default(1)
+  createdBy       String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
@@ -119,7 +121,7 @@ model Booking {
   status          String    @default("CONFIRMED")
   checkIn         DateTime?
   checkOut        DateTime?
-  totalAmount     Int?
+  totalAmount     Float?
   itinerary       Itinerary? @relation(fields: [itineraryId], references: [id])
   itineraryId     Int?
   createdAt       DateTime  @default(now())
@@ -132,6 +134,7 @@ model Itinerary {
   client          Client    @relation(fields: [clientMatricula], references: [matricula])
   clientMatricula String
   notes           String?
+  createdBy       String?
   bookings        Booking[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

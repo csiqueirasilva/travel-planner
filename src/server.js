@@ -465,7 +465,7 @@ app.post('/clients', requireAuth, async (req, res) => {
   const payload = pickClientPayload(req.body);
   try {
     const client = await prisma.client.create({
-      data: { matricula, ...payload },
+      data: { matricula, ...payload, createdBy: req.matricula || (req.isAdmin ? 'admin' : null) },
     });
     res.status(201).json(client);
   } catch (err) {
@@ -482,6 +482,8 @@ app.get('/clients/:matricula', requireAuth, async (req, res) => {
 
 app.put('/clients/:matricula', requireAuth, async (req, res) => {
   const { matricula } = req.params;
+  const existing = await prisma.client.findUnique({ where: { matricula } });
+  if (!existing) return res.status(404).json({ error: 'Client not found' });
   const payload = pickClientPayload(req.body);
   try {
     const client = await prisma.client.update({
@@ -496,7 +498,9 @@ app.put('/clients/:matricula', requireAuth, async (req, res) => {
 
 app.delete('/clients/:matricula', requireAuth, async (req, res) => {
   const { matricula } = req.params;
-  if (!ensureSelfOrAdmin(req, res, matricula)) return;
+  const existing = await prisma.client.findUnique({ where: { matricula } });
+  if (!existing) return res.status(404).json({ error: 'Client not found' });
+  if (!canAccessResource(req, res, existing.matricula, existing.createdBy, 'client')) return;
   try {
     await prisma.client.delete({ where: { matricula } });
     res.json({ deleted: true });
@@ -517,6 +521,8 @@ app.post('/purchases', requireAuth, async (req, res) => {
     guests = 1,
   } = req.body;
   if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
+  const amount = parseAmount(totalAmount);
+  if (amount === null) return res.status(400).json({ error: 'totalAmount must be a number' });
   const dateValidation = validateDateRange(checkIn, checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   if (hotelId && planeId) {
@@ -535,8 +541,9 @@ app.post('/purchases', requireAuth, async (req, res) => {
       planeId,
       checkIn: dateValidation.checkIn,
       checkOut: dateValidation.checkOut,
-      totalAmount,
+      totalAmount: amount,
       guests,
+      createdBy: req.matricula || (req.isAdmin ? 'admin' : null),
     },
   });
   res.status(201).json(purchase);
@@ -548,7 +555,7 @@ app.get('/purchases/:id', requireAuth, async (req, res) => {
     where: { id },
   });
   if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
-  if (!ensureSelfOrAdmin(req, res, purchase.clientMatricula)) return;
+  if (!canAccessPurchase(req, res, purchase)) return;
   res.json(purchase);
 });
 
@@ -556,7 +563,9 @@ app.put('/purchases/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.purchase.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Purchase not found' });
-  if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
+  if (!canAccessPurchase(req, res, existing)) return;
+  const amount = parseAmount(req.body.totalAmount);
+  if (amount === null) return res.status(400).json({ error: 'totalAmount must be a number' });
   const dateValidation = validateDateRange(req.body.checkIn, req.body.checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   if (req.body.hotelId && req.body.planeId) {
@@ -575,7 +584,7 @@ app.put('/purchases/:id', requireAuth, async (req, res) => {
       planeId: req.body.planeId,
       checkIn: dateValidation.checkIn,
       checkOut: dateValidation.checkOut,
-      totalAmount: req.body.totalAmount,
+      totalAmount: amount,
       guests: req.body.guests,
     },
   });
@@ -586,7 +595,7 @@ app.delete('/purchases/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.purchase.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Purchase not found' });
-  if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
+  if (!canAccessPurchase(req, res, existing)) return;
   await prisma.purchase.delete({ where: { id } });
   res.json({ deleted: true });
 });
@@ -677,6 +686,8 @@ app.post('/bookings', requireAuth, async (req, res) => {
     totalAmount,
   } = req.body;
   if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
+  const amount = parseAmount(totalAmount);
+  if (amount === null) return res.status(400).json({ error: 'totalAmount must be a number' });
   const dateValidation = validateDateRange(checkIn, checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   if (hotelId && planeId) {
@@ -697,7 +708,7 @@ app.post('/bookings', requireAuth, async (req, res) => {
       status: status || 'CONFIRMED',
       checkIn: dateValidation.checkIn,
       checkOut: dateValidation.checkOut,
-      totalAmount,
+      totalAmount: amount,
     },
   });
   res.status(201).json(booking);
@@ -718,6 +729,8 @@ app.put('/bookings/:id', requireAuth, async (req, res) => {
   const existing = await prisma.booking.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Booking not found' });
   if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
+  const amount = parseAmount(req.body.totalAmount);
+  if (amount === null) return res.status(400).json({ error: 'totalAmount must be a number' });
   const dateValidation = validateDateRange(req.body.checkIn, req.body.checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
   if (req.body.hotelId && req.body.planeId) {
@@ -738,7 +751,7 @@ app.put('/bookings/:id', requireAuth, async (req, res) => {
       status: req.body.status,
       checkIn: dateValidation.checkIn,
       checkOut: dateValidation.checkOut,
-      totalAmount: req.body.totalAmount,
+      totalAmount: amount,
     },
   });
   res.json(booking);
@@ -759,11 +772,11 @@ app.post('/purchases/:id/attach-itinerary', requireAuth, async (req, res) => {
   if (!itineraryId) return res.status(400).json({ error: 'itineraryId is required' });
   const purchase = await prisma.purchase.findUnique({ where: { id } });
   if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
-  if (!ensureSelfOrAdmin(req, res, purchase.clientMatricula)) return;
+  if (!canAccessPurchase(req, res, purchase)) return;
 
   const itinerary = await prisma.itinerary.findUnique({ where: { id: Number(itineraryId) } });
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
-  if (!ensureSelfOrAdmin(req, res, itinerary.clientMatricula)) return;
+  if (!canAccessResource(req, res, itinerary.clientMatricula, itinerary.createdBy, 'itinerary')) return;
 
   if (!purchase.hotelId && !purchase.planeId) {
     return res.status(400).json({ error: 'Purchase must include a hotelId or planeId to attach' });
@@ -797,11 +810,10 @@ app.post('/purchases/:id/attach-itinerary', requireAuth, async (req, res) => {
 // Itineraries
 app.post('/itineraries', requireAuth, async (req, res) => {
   const { name, notes, clientMatricula = req.matricula } = req.body;
-  if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
   const client = await prisma.client.findUnique({ where: { matricula: clientMatricula } });
   if (!client) return res.status(404).json({ error: 'Client not found for itinerary' });
   const itinerary = await prisma.itinerary.create({
-    data: { name, notes, clientMatricula },
+    data: { name, notes, clientMatricula, createdBy: req.matricula || (req.isAdmin ? 'admin' : null) },
   });
   res.status(201).json(itinerary);
 });
@@ -813,7 +825,7 @@ app.get('/itineraries/:id', requireAuth, async (req, res) => {
     include: { bookings: true },
   });
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
-  if (!ensureSelfOrAdmin(req, res, itinerary.clientMatricula)) return;
+  if (!canAccessResource(req, res, itinerary.clientMatricula, itinerary.createdBy, 'itinerary')) return;
   res.json(itinerary);
 });
 
@@ -821,7 +833,7 @@ app.put('/itineraries/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const itinerary = await prisma.itinerary.findUnique({ where: { id } });
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
-  if (!ensureSelfOrAdmin(req, res, itinerary.clientMatricula)) return;
+  if (!canAccessResource(req, res, itinerary.clientMatricula, itinerary.createdBy, 'itinerary')) return;
   const updated = await prisma.itinerary.update({
     where: { id },
     data: { name: req.body.name, notes: req.body.notes },
@@ -833,7 +845,7 @@ app.delete('/itineraries/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const itinerary = await prisma.itinerary.findUnique({ where: { id } });
   if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
-  if (!ensureSelfOrAdmin(req, res, itinerary.clientMatricula)) return;
+  if (!canAccessResource(req, res, itinerary.clientMatricula, itinerary.createdBy, 'itinerary')) return;
   await prisma.itinerary.delete({ where: { id } });
   res.json({ deleted: true });
 });
@@ -960,10 +972,7 @@ server.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
 });
 
-const wss = new WebSocketServer({ port: WS_PORT });
-console.log(`WebSocket server running on port ${WS_PORT}`);
-
-wss.on('connection', async (ws, req) => {
+function handleUsageWsConnection(ws, req) {
   const url = new URL(req.url || '', 'http://localhost');
   const token = url.searchParams.get('adminToken');
   const includeAdminParam = (url.searchParams.get('includeAdmin') || '').toLowerCase();
@@ -977,17 +986,39 @@ wss.on('connection', async (ws, req) => {
   ws.on('close', () => usageSockets.delete(conn));
   ws.on('error', () => usageSockets.delete(conn));
 
-  try {
-    const logs = await prisma.usageLog.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
-    const filtered = includeAdmin ? logs : logs.filter((l) => !isAdminMat(l.matricula));
-    ws.send(JSON.stringify({ type: 'usage:init', logs: filtered.reverse() }));
-  } catch (err) {
-    ws.send(JSON.stringify({ type: 'usage:init', logs: [] }));
+  (async () => {
+    try {
+      const logs = await prisma.usageLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+      const filtered = includeAdmin ? logs : logs.filter((l) => !isAdminMat(l.matricula));
+      ws.send(JSON.stringify({ type: 'usage:init', logs: filtered.reverse() }));
+    } catch (err) {
+      ws.send(JSON.stringify({ type: 'usage:init', logs: [] }));
+    }
+  })();
+}
+
+// Accept WebSocket connections on the HTTP port (upgrade) and also on WS_PORT for reverse proxies.
+const wss = new WebSocketServer({ noServer: true });
+wss.on('connection', handleUsageWsConnection);
+
+server.on('upgrade', (req, socket, head) => {
+  if (!req.url || !req.url.startsWith('/reports/usage/stream')) {
+    socket.destroy();
+    return;
   }
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
+
+if (WS_PORT) {
+  const standaloneWss = new WebSocketServer({ port: WS_PORT });
+  standaloneWss.on('connection', handleUsageWsConnection);
+  console.log(`WebSocket server running on port ${WS_PORT}`);
+} else {
+  console.log(`WebSocket server attached to HTTP port ${PORT}`);
+}
 
 async function ensureUnaccentExtension() {
   // kept for backward compatibility; no-op after removing unaccent usage
@@ -1050,4 +1081,25 @@ function isAdminMat(matricula) {
   if (!matricula) return false;
   const value = String(matricula);
   return value === 'admin' || ADMIN_MATS.includes(value);
+}
+
+function parseAmount(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function canAccessResource(req, res, targetMatricula, createdBy, resourceName = 'resource') {
+  if (req.isAdmin) return true;
+  if (req.invalidAuthToken || !req.matricula) {
+    res.status(401).json({ error: 'Authorization header required' });
+    return false;
+  }
+  if (req.matricula === targetMatricula) return true;
+  if (createdBy && createdBy === req.matricula) return true;
+  res.status(403).json({ error: `Not allowed for this ${resourceName}` });
+  return false;
+}
+
+function canAccessPurchase(req, res, purchase) {
+  return canAccessResource(req, res, purchase.clientMatricula, purchase.createdBy, 'purchase');
 }

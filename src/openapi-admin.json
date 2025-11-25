@@ -135,7 +135,8 @@
             "nullable": true
           },
           "totalAmount": {
-            "type": "integer"
+            "type": "number",
+            "format": "double"
           },
           "guests": {
             "type": "integer"
@@ -951,9 +952,10 @@
           }
         }
       }
-    },
+  },
     "/clients/{matricula}": {
       "put": {
+        "summary": "Update client (any authenticated matricula can edit)",
         "responses": {
           "200": {
             "description": "Updated"
@@ -1007,6 +1009,7 @@
         ]
       },
       "delete": {
+        "summary": "Delete client (self, creator or admin)",
         "responses": {
           "200": {
             "description": "Deleted"

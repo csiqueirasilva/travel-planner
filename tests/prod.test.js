@@ -184,6 +184,26 @@ test('client lifecycle with self-access only', async () => {
   assert.equal(del.deleted, true);
 });
 
+test('client can be managed by its creator matricula', async () => {
+  const creator = OTHER_TOKEN;
+  const mat = randomMatricula();
+  const body = { matricula: mat, name: 'Creator User', email: `creator${mat}@example.com` };
+  await expectJson('/clients', { method: 'POST', token: creator, body }, 201);
+
+  const fetched = await expectJson(`/clients/${mat}`, { token: creator });
+  assert.equal(fetched.matricula, mat);
+
+  const updated = await expectJson(`/clients/${mat}`, {
+    method: 'PUT',
+    token: creator,
+    body: { matricula: mat, name: 'Creator Updated', email: `creatorupd${mat}@example.com` },
+  });
+  assert.equal(updated.name, 'Creator Updated');
+
+  const deleted = await expectJson(`/clients/${mat}`, { method: 'DELETE', token: creator });
+  assert.equal(deleted.deleted, true);
+});
+
 test('admin can create and manage any client', async () => {
   const mat = randomMatricula();
   const body = { matricula: mat, name: 'Admin Created', email: `admin${mat}@example.com` };
@@ -277,7 +297,7 @@ test('purchases respect ownership; create, update, delete', async () => {
     checkIn: '2030-12-01',
     checkOut: '2030-12-05',
     guests: 2,
-    totalAmount: 1200,
+    totalAmount: 1200.5,
   };
   const created = await expectJson('/purchases', { method: 'POST', token: STUDENT_TOKEN, body: purchaseBody }, 201);
   assert.ok(created.id);
@@ -294,9 +314,10 @@ test('purchases respect ownership; create, update, delete', async () => {
   const updated = await expectJson(`/purchases/${created.id}`, {
     method: 'PUT',
     token: STUDENT_TOKEN,
-    body: { guests: 3, totalAmount: 1300 },
+    body: { guests: 3, totalAmount: 1300.75 },
   });
   assert.equal(updated.guests, 3);
+  assert.equal(Number(updated.totalAmount), 1300.75);
 
   const forbidden = await api(`/purchases/${created.id}`, {
     method: 'PUT',
@@ -612,6 +633,7 @@ test('itinerary with booking linkage and cleanup', async () => {
   const mat = randomMatricula();
   await ensureClientExists(mat);
   await ensureClientExists(OTHER_TOKEN);
+  const hotelForBooking = await findHotelByCity('Rio de Janeiro');
 
   // positive: create itinerary and booking with owner token
   const itinerary = await expectJson(
@@ -630,7 +652,7 @@ test('itinerary with booking linkage and cleanup', async () => {
     {
       method: 'POST',
       token: mat,
-      body: { clientMatricula: mat, hotelId: 1, itineraryId: itinerary.id, totalAmount: 500 },
+      body: { clientMatricula: mat, hotelId: hotelForBooking.id, itineraryId: itinerary.id, totalAmount: 500 },
     },
     201
   );
@@ -701,9 +723,38 @@ test('itinerary with booking linkage and cleanup', async () => {
   assert.equal(redeleted.status, 404);
 });
 
+test('itinerary can be updated/deleted by its creator matricula', async () => {
+  const owner = randomMatricula();
+  const creator = OTHER_TOKEN;
+  await ensureClientExists(owner);
+  await ensureClientExists(creator);
+
+  const itinerary = await expectJson(
+    '/itineraries',
+    {
+      method: 'POST',
+      token: creator,
+      body: { name: 'Creator Itinerary', notes: 'Teste', clientMatricula: owner },
+    },
+    201
+  );
+  assert.ok(itinerary.id);
+
+  const updated = await expectJson(`/itineraries/${itinerary.id}`, {
+    method: 'PUT',
+    token: creator,
+    body: { name: 'Updated by creator', notes: 'Notas' },
+  });
+  assert.equal(updated.name, 'Updated by creator');
+
+  const deleted = await expectJson(`/itineraries/${itinerary.id}`, { method: 'DELETE', token: creator });
+  assert.equal(deleted.deleted, true);
+});
+
 test('can attach a purchase to an itinerary via booking creation', async () => {
   const mat = randomMatricula();
   await ensureClientExists(mat);
+  const hotelForPurchase = await findHotelByCity('Rio de Janeiro');
   const itinerary = await expectJson(
     '/itineraries',
     { method: 'POST', token: mat, body: { name: 'Itinerary Attach', notes: 'Testing' } },
@@ -715,7 +766,13 @@ test('can attach a purchase to an itinerary via booking creation', async () => {
     {
       method: 'POST',
       token: mat,
-      body: { clientMatricula: mat, hotelId: 1, checkIn: '2030-05-01', checkOut: '2030-05-05', totalAmount: 700 },
+      body: {
+        clientMatricula: mat,
+        hotelId: hotelForPurchase.id,
+        checkIn: '2030-05-01',
+        checkOut: '2030-05-05',
+        totalAmount: 700,
+      },
     },
     201
   );
@@ -760,7 +817,7 @@ test('booking detail and update are available to the owner', async () => {
     {
       method: 'POST',
       token: mat,
-      body: { clientMatricula: mat, hotelId: hotelNY.id, planeId: planeNYC.id, totalAmount: 321 },
+      body: { clientMatricula: mat, hotelId: hotelNY.id, planeId: planeNYC.id, totalAmount: 321.5 },
     },
     201
   );
@@ -790,13 +847,16 @@ test('creating itineraries requires authentication', async () => {
 });
 
 test('reviews can be posted and listed', async () => {
-  const review = await expectJson('/hotels/1/reviews', {
+  const hotels = await expectJson('/hotels');
+  assert.ok(Array.isArray(hotels) && hotels.length > 0, 'should have hotels available for reviews');
+  const targetHotel = hotels[0];
+  const review = await expectJson(`/hotels/${targetHotel.id}/reviews`, {
     method: 'POST',
     token: STUDENT_TOKEN,
     body: { rating: 5, comment: 'Teste de review automatizado' },
   }, 201);
   assert.ok(review.id);
-  const list = await expectJson('/hotels/1/reviews');
+  const list = await expectJson(`/hotels/${targetHotel.id}/reviews`);
   assert.ok(Array.isArray(list) && list.some((r) => r.id === review.id));
 });
 

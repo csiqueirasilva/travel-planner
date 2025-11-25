@@ -134,8 +134,7 @@
             "format": "date-time",
             "nullable": true
           },
-          "totalAmount": {
-            "type": "integer"
+          "totalAmount": { "type": "number", "format": "double"
           },
           "guests": {
             "type": "integer"
@@ -1124,15 +1123,15 @@
           }
         }
       }
-    },
-    "/clients/{matricula}": {
-      "get": {
-        "summary": "Get client (self or admin)",
-        "security": [
-          {
-            "MatriculaAuth": []
-          }
-        ],
+  },
+  "/clients/{matricula}": {
+    "get": {
+      "summary": "Get client (any authenticated matricula or admin)",
+      "security": [
+        {
+          "MatriculaAuth": []
+        }
+      ],
         "parameters": [
           {
             "in": "path",
@@ -1151,19 +1150,18 @@
                 "schema": {
                   "$ref": "#/components/schemas/Client"
                 }
-              }
             }
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
-        "operationId": "getClient"
+        "401": { "description": "Unauthorized" }
       },
-      "put": {
-        "responses": {
-          "200": {
-            "description": "Updated"
+      "operationId": "getClient"
+    },
+    "put": {
+      "summary": "Update client (any authenticated matricula can edit)",
+      "responses": {
+        "200": {
+          "description": "Updated"
           },
           "404": {
             "description": "Not found"
@@ -1214,6 +1212,7 @@
         ]
       },
       "delete": {
+        "summary": "Delete client (self, creator or admin)",
         "responses": {
           "200": {
             "description": "Deleted"
@@ -1275,8 +1274,7 @@
                     "type": "string",
                     "format": "date-time"
                   },
-                  "totalAmount": {
-                    "type": "integer"
+                  "totalAmount": { "type": "number", "format": "double"
                   },
                   "guests": {
                     "type": "integer"
@@ -1377,8 +1375,7 @@
                     "type": "string",
                     "format": "date-time"
                   },
-                  "totalAmount": {
-                    "type": "integer"
+                  "totalAmount": { "type": "number", "format": "double"
                   },
                   "guests": {
                     "type": "integer"
@@ -1534,8 +1531,7 @@
                     "type": "string",
                     "format": "date-time"
                   },
-                  "totalAmount": {
-                    "type": "integer"
+                  "totalAmount": { "type": "number", "format": "double"
                   }
                 }
               }
@@ -1546,7 +1542,7 @@
     },
     "/itineraries": {
       "post": {
-        "summary": "Create itinerary (self or admin)",
+        "summary": "Create itinerary (any authenticated matricula)",
         "security": [
           {
             "MatriculaAuth": []
@@ -1586,7 +1582,7 @@
     },
     "/itineraries/{id}": {
       "get": {
-        "summary": "Get itinerary (self or admin)",
+        "summary": "Get itinerary (owner, creator or admin)",
         "security": [
           {
             "MatriculaAuth": []
@@ -1613,7 +1609,7 @@
         "operationId": "getItinerary"
       },
       "put": {
-        "summary": "Update itinerary (self or admin)",
+        "summary": "Update itinerary (owner, creator or admin)",
         "security": [
           {
             "MatriculaAuth": []
@@ -1658,7 +1654,7 @@
         "operationId": "updateItinerary"
       },
       "delete": {
-        "summary": "Delete itinerary (self or admin)",
+        "summary": "Delete itinerary (owner, creator or admin)",
         "security": [
           {
             "MatriculaAuth": []
@@ -1971,8 +1967,7 @@
                     "type": "string",
                     "format": "date-time"
                   },
-                  "totalAmount": {
-                    "type": "integer"
+                  "totalAmount": { "type": "number", "format": "double"
                   }
                 }
               }
