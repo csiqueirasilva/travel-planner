@@ -4,13 +4,12 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const fs = require('fs');
 const path = require('path');
-const { PrismaClient, Role, Prisma } = require('@prisma/client');
+const { PrismaClient, Role } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-let ensuredUnaccent = false;
 
 function loadAdminToken() {
   try {
@@ -318,30 +317,29 @@ app.delete('/locations/:id', requireAuth, requireAdmin, async (req, res) => {
 // Planes / flights
 async function listPlanes(req, res) {
   const { origin, destination, date } = req.query;
-  const clauses = [];
+  const originTokens = tokensForSearch(origin);
+  const destinationTokens = tokensForSearch(destination);
 
-  const originClause = buildFlexibleLike('origin', origin);
-  const destinationClause = buildFlexibleLike('destination', destination);
-
-  if (originClause || destinationClause) {
-    await ensureUnaccentExtension();
+  const where = { AND: [] };
+  if (originTokens.length) {
+    where.AND.push({ OR: originTokens.map((t) => ({ origin: { contains: t, mode: 'insensitive' } })) });
   }
-
-  if (originClause) clauses.push(originClause);
-  if (destinationClause) clauses.push(destinationClause);
-
+  if (destinationTokens.length) {
+    where.AND.push({ OR: destinationTokens.map((t) => ({ destination: { contains: t, mode: 'insensitive' } })) });
+  }
   if (date) {
     const day = new Date(date);
     if (!Number.isNaN(day.getTime())) {
       const nextDay = new Date(day);
       nextDay.setDate(day.getDate() + 1);
-      clauses.push(Prisma.sql`"departure" >= ${day} AND "departure" < ${nextDay}`);
+      where.AND.push({ departure: { gte: day, lt: nextDay } });
     }
   }
 
-  const whereSql = clauses.length ? Prisma.sql`WHERE ${Prisma.join(clauses, Prisma.sql` AND `)}` : Prisma.sql``;
-  const query = Prisma.sql`SELECT * FROM "Plane" ${whereSql} ORDER BY "departure" ASC`;
-  const planes = await prisma.$queryRaw(query);
+  const planes = await prisma.plane.findMany({
+    where: where.AND.length ? where : undefined,
+    orderBy: { departure: 'asc' },
+  });
   res.json(planes);
 }
 
@@ -814,36 +812,24 @@ app.listen(PORT, () => {
 });
 
 async function ensureUnaccentExtension() {
-  if (ensuredUnaccent) return;
-  try {
-    await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS unaccent`;
-    ensuredUnaccent = true;
-  } catch (err) {
-    console.error('Failed to ensure unaccent extension', err.message);
-  }
+  // kept for backward compatibility; no-op after removing unaccent usage
 }
 
-function buildFlexibleLike(columnName, value) {
-  if (!value) return null;
-  const safeColumn = columnName === 'origin' ? Prisma.sql`"origin"` : Prisma.sql`"destination"`;
+function tokensForSearch(value) {
+  if (!value) return [];
   const sanitized = String(value)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
-  if (!sanitized) return null;
-  const tokens = sanitized.split(/\s+/).filter(Boolean);
-  const patterns = new Set();
-  tokens.forEach((t) => patterns.add(`%${t}%`));
-  const noSpaces = tokens.join('');
+  if (!sanitized) return [];
+  const parts = sanitized.split(/\s+/).filter(Boolean);
+  const tokens = new Set(parts);
+  const noSpaces = parts.join('');
   if (noSpaces) {
-    patterns.add(`%${noSpaces}%`);
-    if (noSpaces.length >= 3) patterns.add(`%${noSpaces.slice(0, 3)}%`);
+    tokens.add(noSpaces);
+    if (noSpaces.length >= 3) tokens.add(noSpaces.slice(0, 3));
   }
-  const initials = tokens.map((t) => t[0]).join('');
-  if (initials) patterns.add(`%${initials}%`);
-
-  const clauses = Array.from(patterns).map((p) => Prisma.sql`unaccent(${safeColumn}) ILIKE ${p}`);
-  if (!clauses.length) return null;
-  if (clauses.length === 1) return clauses[0];
-  return Prisma.sql`(${Prisma.join(clauses, Prisma.sql` OR `)})`;
+  const initials = parts.map((p) => p[0]).join('');
+  if (initials) tokens.add(initials);
+  return Array.from(tokens);
 }
