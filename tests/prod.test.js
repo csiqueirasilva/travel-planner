@@ -839,8 +839,8 @@ test('split openapi specs stay under 30 operations', () => {
     Object.values(doc.paths || {}).reduce((acc, methods) => acc + Object.keys(methods || {}).length, 0);
   assert.ok(countOps(clientDoc) <= 30, 'client openapi spec capped at 30 operations');
   assert.ok(countOps(adminDoc) <= 30, 'admin openapi spec capped at 30 operations');
-  assert.ok(clientDoc.paths?.['/auth/login']?.post, 'client spec keeps auth/login');
   assert.ok(adminDoc.paths?.['/reports/usage']?.get, 'admin spec keeps reports/usage');
+  assert.ok(!clientDoc.paths?.['/auth/login'], 'client spec excludes auth/login to stay lean');
   assert.ok(!adminDoc.paths?.['/auth/login'], 'admin spec excludes auth/login to stay lean');
 });
 

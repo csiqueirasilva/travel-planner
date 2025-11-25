@@ -278,32 +278,6 @@
         "operationId": "healthCheck"
       }
     },
-    "/auth/login": {
-      "post": {
-        "summary": "Echo bearer token for a matricula",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "matricula": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Token issued"
-          }
-        },
-        "operationId": "login"
-      }
-    },
     "/locations": {
       "get": {
         "summary": "List locations (cities/regions)",
