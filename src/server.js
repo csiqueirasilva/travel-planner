@@ -85,6 +85,10 @@ app.use(async (req, res, next) => {
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.get('/status', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.get('/openapi.json', (req, res) => res.sendFile(openApiPath));
+app.get('/privacy', (req, res) => {
+  const filePath = path.join(__dirname, '..', 'PRIVACY.md');
+  res.sendFile(filePath);
+});
 app.use(
   '/docs',
   swaggerUi.serve,
