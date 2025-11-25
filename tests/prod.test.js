@@ -705,12 +705,16 @@ test('itinerary with booking linkage and cleanup', async () => {
   });
   assert.equal(bookingDeleteForbidden.status, 403, 'other user should not delete booking');
 
-  const bookingCrossCreate = await api('/bookings', {
+  const bookingCrossCreate = await expectJson('/bookings', {
     method: 'POST',
     token: OTHER_TOKEN,
-    body: { clientMatricula: mat, hotelId: 1, totalAmount: 123 },
-  });
-  assert.equal(bookingCrossCreate.status, 403, 'cannot create booking for another matricula');
+    body: { clientMatricula: mat, hotelId: hotelForBooking.id, totalAmount: 123 },
+  }, 201);
+  assert.equal(bookingCrossCreate.createdBy, OTHER_TOKEN);
+  const crossFetchByOwner = await expectJson(`/bookings/${bookingCrossCreate.id}`, { token: mat });
+  assert.equal(crossFetchByOwner.id, bookingCrossCreate.id);
+  const crossFetchByCreator = await expectJson(`/bookings/${bookingCrossCreate.id}`, { token: OTHER_TOKEN });
+  assert.equal(crossFetchByCreator.id, bookingCrossCreate.id);
 
   const bookingNoAuth = await api(`/bookings/${booking.id}`);
   assert.equal(bookingNoAuth.status, 401, 'booking read requires auth');

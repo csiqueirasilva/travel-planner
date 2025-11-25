@@ -685,7 +685,6 @@ app.post('/bookings', requireAuth, async (req, res) => {
     checkOut,
     totalAmount,
   } = req.body;
-  if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
   const amount = parseAmount(totalAmount);
   if (amount === null) return res.status(400).json({ error: 'totalAmount must be a number' });
   const dateValidation = validateDateRange(checkIn, checkOut);
