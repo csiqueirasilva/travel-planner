@@ -278,7 +278,7 @@ test('purchases respect ownership; create, update, delete', async () => {
   const planeNYC = await findPlaneByDestination('NYC');
   const hotelNY = await findHotelByCity('New York');
 
-  const crossCreate = await api('/purchases', {
+  const crossCreate = await expectJson('/purchases', {
     method: 'POST',
     token: OTHER_TOKEN,
     body: {
@@ -287,8 +287,12 @@ test('purchases respect ownership; create, update, delete', async () => {
       planeId: planeNYC.id,
       totalAmount: 999,
     },
-  });
-  assert.equal(crossCreate.status, 403, 'cannot create purchase for another matricula');
+  }, 201);
+  assert.equal(crossCreate.createdBy, OTHER_TOKEN);
+  const crossOwnerRead = await expectJson(`/purchases/${crossCreate.id}`, { token: STUDENT_TOKEN });
+  assert.equal(crossOwnerRead.id, crossCreate.id);
+  const crossCreatorRead = await expectJson(`/purchases/${crossCreate.id}`, { token: OTHER_TOKEN });
+  assert.equal(crossCreatorRead.id, crossCreate.id);
 
   const purchaseBody = {
     clientMatricula: STUDENT_TOKEN,
