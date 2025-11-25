@@ -26,7 +26,6 @@ function loadAdminToken() {
 const ADMIN_TOKEN = loadAdminToken();
 
 const openApiPath = path.join(__dirname, 'openapi.json');
-const openApiDoc = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
 
 app.use(
   cors({
@@ -85,8 +84,12 @@ app.use(async (req, res, next) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.get('/status', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
-app.get('/openapi.json', (req, res) => res.json(openApiDoc));
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDoc, { explorer: true }));
+app.get('/openapi.json', (req, res) => res.sendFile(openApiPath));
+app.use(
+  '/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(null, { explorer: true, swaggerUrl: '/openapi.json' })
+);
 
 function ensureSelfOrAdmin(req, res, targetMatricula) {
   if (req.isAdmin) return true;
