@@ -1,0 +1,1346 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Travel Planner API - Admin",
+    "version": "1.0.0",
+    "description": "Classroom API with open CORS, 7-digit matricula auth header, and admin/student roles."
+  },
+  "servers": [
+    {
+      "url": "https://leiame.app",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "MatriculaAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "MatriculaAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Use a 7-digit matricula for student requests or the admin token from config/admin.json to access admin routes."
+      }
+    },
+    "schemas": {
+      "Hotel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "price": {
+            "type": "integer"
+          },
+          "stars": {
+            "type": "integer"
+          },
+          "amenities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Plane": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "arrival": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "price": {
+            "type": "integer"
+          }
+        }
+      },
+      "Client": {
+        "type": "object",
+        "properties": {
+          "matricula": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "STUDENT",
+              "ADMIN"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Purchase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "clientMatricula": {
+            "type": "string"
+          },
+          "hotelId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "planeId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "totalAmount": {
+            "type": "integer"
+          },
+          "guests": {
+            "type": "integer"
+          }
+        }
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "clientMatricula": {
+            "type": "string"
+          },
+          "hotelId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "planeId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "itineraryId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "Offer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "discountPercent": {
+            "type": "integer"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "hotelId": {
+            "type": "integer"
+          },
+          "clientMatricula": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "integer"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Itinerary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "clientMatricula": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "bookings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Booking"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "Echo bearer token for a matricula",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "matricula": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued"
+          }
+        },
+        "operationId": "login"
+      }
+    },
+    "/locations": {
+      "get": {
+        "summary": "List locations (cities/regions)",
+        "responses": {
+          "200": {
+            "description": "Locations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Location"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listLocations"
+      },
+      "post": {
+        "summary": "Create location (admin token required)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "operationId": "createLocation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/locations/{id}": {
+      "put": {
+        "summary": "Update location (admin token required)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "updateLocation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete location (admin token required)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deleteLocation"
+      }
+    },
+    "/hotels": {
+      "get": {
+        "summary": "List hotels",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "city",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "priceMin",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "priceMax",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stars",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "amenities",
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated list, e.g. wifi,pool"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hotel list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Hotel"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listHotels"
+      },
+      "post": {
+        "summary": "Create hotel (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "operationId": "createHotel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "integer"
+                  },
+                  "stars": {
+                    "type": "integer"
+                  },
+                  "amenities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "locationId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hotels/{id}": {
+      "get": {
+        "summary": "Hotel by id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hotel"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "getHotel"
+      },
+      "put": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "integer"
+                  },
+                  "stars": {
+                    "type": "integer"
+                  },
+                  "amenities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "locationId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updateHotel",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "integer"
+                  },
+                  "stars": {
+                    "type": "integer"
+                  },
+                  "amenities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "locationId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchHotel",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteHotel",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      }
+    },
+    "/planes": {
+      "get": {
+        "summary": "List flights",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "origin",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "destination",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flights",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Plane"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listPlanes"
+      },
+      "post": {
+        "summary": "Create flight (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "operationId": "createPlane",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "origin",
+                  "destination",
+                  "price"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  },
+                  "departure": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "arrival": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "price": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planes/search": {
+      "get": {
+        "summary": "Search flights (alias of /planes)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "origin",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "destination",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flights",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Plane"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "searchPlanes"
+      }
+    },
+    "/clients": {
+      "get": {
+        "summary": "List clients (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clients"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "operationId": "listClients"
+      },
+      "post": {
+        "summary": "Create client (requires matricula token or admin token)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "operationId": "createClient",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "matricula",
+                  "name",
+                  "email"
+                ],
+                "properties": {
+                  "matricula": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "STUDENT",
+                      "ADMIN"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients/{matricula}": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "matricula",
+                  "name",
+                  "email"
+                ],
+                "properties": {
+                  "matricula": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "STUDENT",
+                      "ADMIN"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updateClient",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deleteClient",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      }
+    },
+    "/offers": {
+      "get": {
+        "summary": "List offers (optionally filter by date)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Return offers valid on or after this date; optional."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Offers"
+          }
+        },
+        "operationId": "listOffers"
+      },
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "discountPercent"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "discountPercent": {
+                    "type": "integer"
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "createOffer",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      }
+    },
+    "/reports/sales": {
+      "get": {
+        "summary": "Sales report (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated sales"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "operationId": "getSalesReport"
+      }
+    },
+    "/planes/{id}": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "origin",
+                  "destination",
+                  "price"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  },
+                  "departure": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "arrival": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "price": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updatePlane",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deletePlane",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plane"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "getPlane"
+      }
+    },
+    "/offers/{id}": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "discountPercent"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "discountPercent": {
+                    "type": "integer"
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updateOffer",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get offer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Offer"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "getOffer"
+      },
+      "delete": {
+        "summary": "Delete offer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deleteOffer",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      }
+    },
+    "/reports/clients": {
+      "get": {
+        "summary": "Clients report (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clients report"
+          }
+        },
+        "operationId": "getClientsReport"
+      }
+    },
+    "/reports/top-destinations": {
+      "get": {
+        "summary": "Top destinations (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top destinations"
+          }
+        },
+        "operationId": "getTopDestinations"
+      }
+    },
+    "/reports/usage": {
+      "get": {
+        "summary": "Usage logs (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "matricula",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage logs"
+          }
+        },
+        "operationId": "getUsageLogs"
+      }
+    }
+  }
+}

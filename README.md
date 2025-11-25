@@ -23,7 +23,7 @@ npm run dev
 ```
 
 ## Tests
-- The suite has 31 Node test cases covering positive/negative paths against the OpenAPI spec.
+- The suite has 32 Node test cases covering positive/negative paths against the OpenAPI spec.
 - Ensure the API is running and `.env` includes `BASE_URL` (pointing at the running API) and `ADMIN_TOKEN`; `STUDENT_TOKEN`/`OTHER_TOKEN` can be set to override the defaults used in tests.
 - Run: `npm run test:prod` (loads env via dotenv automatically).
 
@@ -45,6 +45,7 @@ npm run dev
 - Reports (admin): `/reports/sales`, `/reports/clients`, `/reports/top-destinations`, `/reports/usage?matricula=`.
 - Auth helper: `POST /auth/login` echoes `Bearer` token for a matricula.
 - Docs: Swagger UI at `/docs` and raw spec at `/openapi.json`.
+- Split OpenAPI specs (<=30 ops each): `/openapi-client.json` (student flows) and `/openapi-admin.json` (admin flows). Swagger UI exposes both in the selector at `/docs`.
 
 ## Notes
 - CORS is fully open (`*`) in both Express and the reverse proxy (Caddy).

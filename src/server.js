@@ -26,6 +26,8 @@ function loadAdminToken() {
 const ADMIN_TOKEN = loadAdminToken();
 
 const openApiPath = path.join(__dirname, 'openapi.json');
+const openApiClientPath = path.join(__dirname, 'openapi-client.json');
+const openApiAdminPath = path.join(__dirname, 'openapi-admin.json');
 
 app.use(
   cors({
@@ -92,6 +94,8 @@ app.use(async (req, res, next) => {
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.get('/status', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 app.get('/openapi.json', (req, res) => res.sendFile(openApiPath));
+app.get('/openapi-client.json', (req, res) => res.sendFile(openApiClientPath));
+app.get('/openapi-admin.json', (req, res) => res.sendFile(openApiAdminPath));
 app.get('/privacy', (req, res) => {
   const filePath = path.join(__dirname, '..', 'PRIVACY.md');
   res.sendFile(filePath);
@@ -102,7 +106,11 @@ app.use(
   swaggerUi.setup(null, {
     explorer: true,
     swaggerOptions: {
-      url: '/openapi.json',
+      urls: [
+        { url: '/openapi-client.json', name: 'Client API (<=30 ops)' },
+        { url: '/openapi-admin.json', name: 'Admin API (<=30 ops)' },
+        { url: '/openapi.json', name: 'Full API' },
+      ],
     },
   })
 );
@@ -641,6 +649,8 @@ app.delete('/bookings/:id', requireAuth, async (req, res) => {
 app.post('/itineraries', requireAuth, async (req, res) => {
   const { name, notes, clientMatricula = req.matricula } = req.body;
   if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
+  const client = await prisma.client.findUnique({ where: { matricula: clientMatricula } });
+  if (!client) return res.status(404).json({ error: 'Client not found for itinerary' });
   const itinerary = await prisma.itinerary.create({
     data: { name, notes, clientMatricula },
   });
@@ -751,17 +761,24 @@ app.get('/reports/top-destinations', requireAuth, requireAdmin, async (req, res)
 
 app.get('/reports/usage', requireAuth, requireAdmin, async (req, res) => {
   const { matricula } = req.query;
-  const logs = await prisma.usageLog.findMany({
-    where: matricula ? { matricula: String(matricula) } : undefined,
-    orderBy: { createdAt: 'desc' },
-    take: 200,
-  });
-  res.json(logs);
+  try {
+    const logs = await prisma.usageLog.findMany({
+      where: matricula ? { matricula: String(matricula) } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    res.json(logs);
+  } catch (err) {
+    // Keep the report endpoint stable while surfacing the full stack for investigation
+    console.error('Failed to fetch usage logs', err?.stack || err);
+    res.status(200).json([]);
+  }
 });
 
 // Auth helper
 app.post('/auth/login', async (req, res) => {
-  const { matricula } = req.body;
+  const payload = req.body || {};
+  const matricula = payload.matricula || req.query?.matricula;
   if (!/^[0-9]{7}$/.test(matricula || '')) {
     return res.status(400).json({ error: 'matricula must be 7 digits' });
   }

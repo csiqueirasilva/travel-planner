@@ -10,6 +10,8 @@ const STUDENT_TOKEN = process.env.STUDENT_TOKEN || '1234567';
 const OTHER_TOKEN = process.env.OTHER_TOKEN || randomMatricula(); // used for cross-access tests
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 const OPENAPI_PATH = path.join(__dirname, '..', 'src', 'openapi.json');
+const OPENAPI_CLIENT_PATH = path.join(__dirname, '..', 'src', 'openapi-client.json');
+const OPENAPI_ADMIN_PATH = path.join(__dirname, '..', 'src', 'openapi-admin.json');
 
 if (!ADMIN_TOKEN) {
   throw new Error('ADMIN_TOKEN env required to run full API coverage tests');
@@ -828,6 +830,17 @@ test('admin-only endpoints block student tokens', async () => {
 
   const missingAuth = await api('/hotels', { method: 'POST', body: { name: 'Sem Auth' } });
   assert.equal(missingAuth.status, 401, 'admin endpoints should reject missing Authorization header');
+});
+
+test('split openapi specs stay under 30 operations', () => {
+  const clientDoc = JSON.parse(fs.readFileSync(OPENAPI_CLIENT_PATH, 'utf8'));
+  const adminDoc = JSON.parse(fs.readFileSync(OPENAPI_ADMIN_PATH, 'utf8'));
+  const countOps = (doc) =>
+    Object.values(doc.paths || {}).reduce((acc, methods) => acc + Object.keys(methods || {}).length, 0);
+  assert.ok(countOps(clientDoc) <= 30, 'client openapi spec capped at 30 operations');
+  assert.ok(countOps(adminDoc) <= 30, 'admin openapi spec capped at 30 operations');
+  assert.ok(clientDoc.paths?.['/auth/login']?.post, 'client spec keeps auth/login');
+  assert.ok(adminDoc.paths?.['/reports/usage']?.get, 'admin spec keeps reports/usage');
 });
 
 test('openapi client schema drives a successful client creation', async () => {
