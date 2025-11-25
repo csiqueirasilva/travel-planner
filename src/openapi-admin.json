@@ -266,6 +266,59 @@
       }
     }
   },
+  "/purchases/{id}/attach-itinerary": {
+    "post": {
+      "summary": "Attach a purchase to an itinerary by creating a booking",
+      "security": [
+        {
+          "MatriculaAuth": []
+        }
+      ],
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "itineraryId"
+              ],
+              "properties": {
+                "itineraryId": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Booking created from purchase for the itinerary"
+        },
+        "400": {
+          "description": "Invalid input"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      },
+      "operationId": "attachPurchaseToItinerary"
+    }
+  },
   "paths": {
     "/locations": {
       "get": {

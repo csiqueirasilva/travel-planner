@@ -266,6 +266,59 @@
       }
     }
   },
+  "/purchases/{id}/attach-itinerary": {
+    "post": {
+      "summary": "Attach a purchase to an itinerary by creating a booking",
+      "security": [
+        {
+          "MatriculaAuth": []
+        }
+      ],
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "itineraryId"
+              ],
+              "properties": {
+                "itineraryId": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Booking created from purchase for the itinerary"
+        },
+        "400": {
+          "description": "Invalid input"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not found"
+        }
+      },
+      "operationId": "attachPurchaseToItinerary"
+    }
+  },
   "paths": {
     "/health": {
       "get": {
@@ -339,7 +392,39 @@
             "description": "Forbidden"
           }
         },
-        "operationId": "createLocation"
+        "operationId": "createLocation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/locations/{id}": {
@@ -390,7 +475,39 @@
             "description": "Not found"
           }
         },
-        "operationId": "updateLocation"
+        "operationId": "updateLocation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "delete": {
         "summary": "Delete location (admin token required)",
@@ -493,7 +610,51 @@
             "description": "Forbidden"
           }
         },
-        "operationId": "createHotel"
+        "operationId": "createHotel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "integer"
+                  },
+                  "stars": {
+                    "type": "integer"
+                  },
+                  "amenities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "locationId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/hotels/{id}": {
@@ -518,6 +679,118 @@
           }
         },
         "operationId": "getHotel"
+      },
+      "put": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "integer"
+                  },
+                  "stars": {
+                    "type": "integer"
+                  },
+                  "amenities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "locationId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updateHotel",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "city",
+                  "country"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "integer"
+                  },
+                  "stars": {
+                    "type": "integer"
+                  },
+                  "amenities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "locationId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchHotel",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteHotel",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
       }
     },
     "/hotels/{id}/availability": {
@@ -693,7 +966,45 @@
             "description": "Forbidden"
           }
         },
-        "operationId": "createPlane"
+        "operationId": "createPlane",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "origin",
+                  "destination",
+                  "price"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  },
+                  "departure": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "arrival": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "price": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/planes/search": {
@@ -848,6 +1159,75 @@
           }
         },
         "operationId": "getClient"
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "matricula",
+                  "name",
+                  "email"
+                ],
+                "properties": {
+                  "matricula": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "STUDENT",
+                      "ADMIN"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updateClient",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deleteClient",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
       }
     },
     "/purchases": {
@@ -866,7 +1246,46 @@
             "description": "Forbidden"
           }
         },
-        "operationId": "createPurchase"
+        "operationId": "createPurchase",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clientMatricula",
+                  "totalAmount"
+                ],
+                "properties": {
+                  "clientMatricula": {
+                    "type": "string"
+                  },
+                  "hotelId": {
+                    "type": "integer"
+                  },
+                  "planeId": {
+                    "type": "integer"
+                  },
+                  "checkIn": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "checkOut": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "totalAmount": {
+                    "type": "integer"
+                  },
+                  "guests": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/purchases/{id}": {
@@ -929,7 +1348,46 @@
             "description": "Not found"
           }
         },
-        "operationId": "updatePurchase"
+        "operationId": "updatePurchase",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clientMatricula",
+                  "totalAmount"
+                ],
+                "properties": {
+                  "clientMatricula": {
+                    "type": "string"
+                  },
+                  "hotelId": {
+                    "type": "integer"
+                  },
+                  "planeId": {
+                    "type": "integer"
+                  },
+                  "checkIn": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "checkOut": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "totalAmount": {
+                    "type": "integer"
+                  },
+                  "guests": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "delete": {
         "summary": "Delete purchase (self or admin)",
@@ -979,6 +1437,43 @@
           }
         },
         "operationId": "listOffers"
+      },
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "discountPercent"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "discountPercent": {
+                    "type": "integer"
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "createOffer",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
       }
     },
     "/offers/today": {
@@ -1005,7 +1500,48 @@
             "description": "Created"
           }
         },
-        "operationId": "createBooking"
+        "operationId": "createBooking",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clientMatricula"
+                ],
+                "properties": {
+                  "clientMatricula": {
+                    "type": "string"
+                  },
+                  "hotelId": {
+                    "type": "integer"
+                  },
+                  "planeId": {
+                    "type": "integer"
+                  },
+                  "itineraryId": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "checkIn": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "checkOut": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "totalAmount": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/itineraries": {
@@ -1021,7 +1557,31 @@
             "description": "Created"
           }
         },
-        "operationId": "createItinerary"
+        "operationId": "createItinerary",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "clientMatricula": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/itineraries/{id}": {
@@ -1044,14 +1604,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Itinerary",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Itinerary"
-                }
-              }
-            }
+            "description": "Itinerary"
           },
           "404": {
             "description": "Not found"
@@ -1103,6 +1656,33 @@
           }
         },
         "operationId": "updateItinerary"
+      },
+      "delete": {
+        "summary": "Delete itinerary (self or admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deleteItinerary"
       }
     },
     "/reports/sales": {
@@ -1122,6 +1702,400 @@
           }
         },
         "operationId": "getSalesReport"
+      }
+    },
+    "/status": {
+      "get": {
+        "summary": "Status check",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "operationId": "statusCheck"
+      }
+    },
+    "/planes/{id}": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "origin",
+                  "destination",
+                  "price"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  },
+                  "departure": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "arrival": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "price": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updatePlane",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deletePlane",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plane"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "getPlane"
+      }
+    },
+    "/offers/{id}": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "discountPercent"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "discountPercent": {
+                    "type": "integer"
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updateOffer",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get offer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Offer"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "getOffer"
+      },
+      "delete": {
+        "summary": "Delete offer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deleteOffer",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      }
+    },
+    "/bookings/{id}": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clientMatricula"
+                ],
+                "properties": {
+                  "clientMatricula": {
+                    "type": "string"
+                  },
+                  "hotelId": {
+                    "type": "integer"
+                  },
+                  "planeId": {
+                    "type": "integer"
+                  },
+                  "itineraryId": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "checkIn": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "checkOut": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "totalAmount": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "updateBooking",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get booking",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "getBooking",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete booking",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "deleteBooking",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ]
+      }
+    },
+    "/reports/clients": {
+      "get": {
+        "summary": "Clients report (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clients report"
+          }
+        },
+        "operationId": "getClientsReport"
+      }
+    },
+    "/reports/top-destinations": {
+      "get": {
+        "summary": "Top destinations (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top destinations"
+          }
+        },
+        "operationId": "getTopDestinations"
+      }
+    },
+    "/reports/usage": {
+      "get": {
+        "summary": "Usage logs (admin)",
+        "security": [
+          {
+            "MatriculaAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "matricula",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage logs"
+          }
+        },
+        "operationId": "getUsageLogs"
       }
     }
   }

@@ -128,6 +128,20 @@ test('planes search accepts city names with accents and spaces', async () => {
   assert.ok(planes.length > 0, 'should match flights even when searching by city names');
 });
 
+async function findPlaneByDestination(destCode) {
+  const planes = await expectJson(`/planes/search?destination=${destCode}`);
+  const plane = planes.find((p) => String(p.destination).toUpperCase().includes(destCode.toUpperCase()));
+  assert.ok(plane, `should find plane to ${destCode}`);
+  return plane;
+}
+
+async function findHotelByCity(city) {
+  const hotels = await expectJson(`/hotels?city=${encodeURIComponent(city)}`);
+  const hotel = hotels.find((h) => String(h.city).toLowerCase().includes(city.toLowerCase()));
+  assert.ok(hotel, `should find hotel in ${city}`);
+  return hotel;
+}
+
 test('offers today and by date', async () => {
   const today = await expectJson('/offers/today');
   assert.ok(Array.isArray(today));
@@ -237,14 +251,16 @@ test('clients can update their own profile data', async () => {
 test('purchases respect ownership; create, update, delete', async () => {
   await ensureClientExists(STUDENT_TOKEN);
   await ensureClientExists(OTHER_TOKEN);
+  const planeNYC = await findPlaneByDestination('NYC');
+  const hotelNY = await findHotelByCity('New York');
 
   const crossCreate = await api('/purchases', {
     method: 'POST',
     token: OTHER_TOKEN,
     body: {
       clientMatricula: STUDENT_TOKEN,
-      hotelId: 1,
-      planeId: 1,
+      hotelId: hotelNY.id,
+      planeId: planeNYC.id,
       totalAmount: 999,
     },
   });
@@ -252,8 +268,8 @@ test('purchases respect ownership; create, update, delete', async () => {
 
   const purchaseBody = {
     clientMatricula: STUDENT_TOKEN,
-    hotelId: 1,
-    planeId: 1,
+    hotelId: hotelNY.id,
+    planeId: planeNYC.id,
     checkIn: '2030-12-01',
     checkOut: '2030-12-05',
     guests: 2,
@@ -323,6 +339,54 @@ test('purchases and bookings reject past dates and invalid ranges', async () => 
     },
   });
   assert.equal(badRangeBooking.status, 400, 'should reject bookings with checkOut before checkIn');
+});
+
+test('purchases and bookings enforce coherent plane/hotel destinations', async () => {
+  const planeNYC = await findPlaneByDestination('NYC');
+  const hotelNY = await findHotelByCity('New York');
+  const purchaseOk = await expectJson('/purchases', {
+    method: 'POST',
+    token: STUDENT_TOKEN,
+    body: {
+      clientMatricula: STUDENT_TOKEN,
+      hotelId: hotelNY.id,
+      planeId: planeNYC.id,
+      checkIn: '2030-03-01',
+      checkOut: '2030-03-05',
+      totalAmount: 500,
+    },
+  }, 201);
+
+  const mismatchedHotel = await findHotelByCity('Rio de Janeiro');
+  const badPurchase = await api('/purchases', {
+    method: 'POST',
+    token: STUDENT_TOKEN,
+    body: {
+      clientMatricula: STUDENT_TOKEN,
+      hotelId: mismatchedHotel.id,
+      planeId: planeNYC.id,
+      checkIn: '2030-04-01',
+      checkOut: '2030-04-05',
+      totalAmount: 600,
+    },
+  });
+  assert.equal(badPurchase.status, 400, 'should reject mismatched plane/hotel destinations');
+
+  await expectJson(`/purchases/${purchaseOk.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
+
+  const badBooking = await api('/bookings', {
+    method: 'POST',
+    token: STUDENT_TOKEN,
+    body: {
+      clientMatricula: STUDENT_TOKEN,
+      hotelId: mismatchedHotel.id,
+      planeId: planeNYC.id,
+      checkIn: '2030-04-01',
+      checkOut: '2030-04-05',
+      totalAmount: 600,
+    },
+  });
+  assert.equal(badBooking.status, 400, 'should reject mismatched plane/hotel destinations on booking');
 });
 
 test('admin CRUD for locations, hotels, planes and sales report', async () => {
@@ -633,16 +697,66 @@ test('itinerary with booking linkage and cleanup', async () => {
   assert.equal(redeleted.status, 404);
 });
 
+test('can attach a purchase to an itinerary via booking creation', async () => {
+  const mat = randomMatricula();
+  await ensureClientExists(mat);
+  const itinerary = await expectJson(
+    '/itineraries',
+    { method: 'POST', token: mat, body: { name: 'Itinerary Attach', notes: 'Testing' } },
+    201
+  );
+
+  const purchase = await expectJson(
+    '/purchases',
+    {
+      method: 'POST',
+      token: mat,
+      body: { clientMatricula: mat, hotelId: 1, checkIn: '2030-05-01', checkOut: '2030-05-05', totalAmount: 700 },
+    },
+    201
+  );
+
+  const booking = await expectJson(
+    `/purchases/${purchase.id}/attach-itinerary`,
+    { method: 'POST', token: mat, body: { itineraryId: itinerary.id } },
+    201
+  );
+  assert.equal(booking.itineraryId, itinerary.id);
+  assert.equal(booking.hotelId, purchase.hotelId);
+
+  // idempotent-ish: calling again returns existing
+  const bookingAgain = await expectJson(`/purchases/${purchase.id}/attach-itinerary`, {
+    method: 'POST',
+    token: mat,
+    body: { itineraryId: itinerary.id },
+  });
+  assert.equal(bookingAgain.id, booking.id);
+
+  const otherItin = await expectJson(
+    '/itineraries',
+    { method: 'POST', token: OTHER_TOKEN, body: { name: 'Other Itin' } },
+    201
+  );
+  const forbidden = await api(`/purchases/${purchase.id}/attach-itinerary`, {
+    method: 'POST',
+    token: OTHER_TOKEN,
+    body: { itineraryId: otherItin.id },
+  });
+  assert.equal(forbidden.status, 403);
+});
+
 test('booking detail and update are available to the owner', async () => {
   const mat = randomMatricula();
   await ensureClientExists(mat);
+  const planeNYC = await findPlaneByDestination('NYC');
+  const hotelNY = await findHotelByCity('New York');
 
   const booking = await expectJson(
     '/bookings',
     {
       method: 'POST',
       token: mat,
-      body: { clientMatricula: mat, hotelId: 1, planeId: 1, totalAmount: 321 },
+      body: { clientMatricula: mat, hotelId: hotelNY.id, planeId: planeNYC.id, totalAmount: 321 },
     },
     201
   );
@@ -758,10 +872,12 @@ test('missing resources return 404 with auth provided', async () => {
 
 test('double delete on purchases returns 404 after first removal', async () => {
   await ensureClientExists(STUDENT_TOKEN);
+  const planeNYC = await findPlaneByDestination('NYC');
+  const hotelNY = await findHotelByCity('New York');
   const purchaseBody = {
     clientMatricula: STUDENT_TOKEN,
-    hotelId: 1,
-    planeId: 1,
+    hotelId: hotelNY.id,
+    planeId: planeNYC.id,
     totalAmount: 500,
   };
   const created = await expectJson('/purchases', { method: 'POST', token: STUDENT_TOKEN, body: purchaseBody }, 201);

@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const fs = require('fs');
 const path = require('path');
@@ -29,13 +28,18 @@ const openApiPath = path.join(__dirname, 'openapi.json');
 const openApiClientPath = path.join(__dirname, 'openapi-client.json');
 const openApiAdminPath = path.join(__dirname, 'openapi-admin.json');
 
-app.use(
-  cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['*'],
-  })
-);
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
 app.use(express.json({ limit: '1mb' }));
 
 function parseAuth(header) {
@@ -502,6 +506,15 @@ app.post('/purchases', requireAuth, async (req, res) => {
   if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
   const dateValidation = validateDateRange(checkIn, checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
+  if (hotelId && planeId) {
+    const [hotel, plane] = await Promise.all([
+      prisma.hotel.findUnique({ where: { id: hotelId } }),
+      prisma.plane.findUnique({ where: { id: planeId } }),
+    ]);
+    if (hotel && plane && !destinationMatchesCity(plane.destination, hotel.city)) {
+      return res.status(400).json({ error: 'Plane destination does not match hotel city' });
+    }
+  }
   const purchase = await prisma.purchase.create({
     data: {
       clientMatricula,
@@ -533,6 +546,15 @@ app.put('/purchases/:id', requireAuth, async (req, res) => {
   if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
   const dateValidation = validateDateRange(req.body.checkIn, req.body.checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
+  if (req.body.hotelId && req.body.planeId) {
+    const [hotel, plane] = await Promise.all([
+      prisma.hotel.findUnique({ where: { id: req.body.hotelId } }),
+      prisma.plane.findUnique({ where: { id: req.body.planeId } }),
+    ]);
+    if (hotel && plane && !destinationMatchesCity(plane.destination, hotel.city)) {
+      return res.status(400).json({ error: 'Plane destination does not match hotel city' });
+    }
+  }
   const purchase = await prisma.purchase.update({
     where: { id },
     data: {
@@ -644,6 +666,15 @@ app.post('/bookings', requireAuth, async (req, res) => {
   if (!ensureSelfOrAdmin(req, res, clientMatricula)) return;
   const dateValidation = validateDateRange(checkIn, checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
+  if (hotelId && planeId) {
+    const [hotel, plane] = await Promise.all([
+      prisma.hotel.findUnique({ where: { id: hotelId } }),
+      prisma.plane.findUnique({ where: { id: planeId } }),
+    ]);
+    if (hotel && plane && !destinationMatchesCity(plane.destination, hotel.city)) {
+      return res.status(400).json({ error: 'Plane destination does not match hotel city' });
+    }
+  }
   const booking = await prisma.booking.create({
     data: {
       clientMatricula,
@@ -676,6 +707,15 @@ app.put('/bookings/:id', requireAuth, async (req, res) => {
   if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
   const dateValidation = validateDateRange(req.body.checkIn, req.body.checkOut);
   if (dateValidation.error) return res.status(400).json({ error: dateValidation.error });
+  if (req.body.hotelId && req.body.planeId) {
+    const [hotel, plane] = await Promise.all([
+      prisma.hotel.findUnique({ where: { id: req.body.hotelId } }),
+      prisma.plane.findUnique({ where: { id: req.body.planeId } }),
+    ]);
+    if (hotel && plane && !destinationMatchesCity(plane.destination, hotel.city)) {
+      return res.status(400).json({ error: 'Plane destination does not match hotel city' });
+    }
+  }
   const booking = await prisma.booking.update({
     where: { id },
     data: {
@@ -698,6 +738,47 @@ app.delete('/bookings/:id', requireAuth, async (req, res) => {
   if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
   await prisma.booking.delete({ where: { id } });
   res.json({ deleted: true });
+});
+
+app.post('/purchases/:id/attach-itinerary', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { itineraryId } = req.body || {};
+  if (!itineraryId) return res.status(400).json({ error: 'itineraryId is required' });
+  const purchase = await prisma.purchase.findUnique({ where: { id } });
+  if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
+  if (!ensureSelfOrAdmin(req, res, purchase.clientMatricula)) return;
+
+  const itinerary = await prisma.itinerary.findUnique({ where: { id: Number(itineraryId) } });
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+  if (!ensureSelfOrAdmin(req, res, itinerary.clientMatricula)) return;
+
+  if (!purchase.hotelId && !purchase.planeId) {
+    return res.status(400).json({ error: 'Purchase must include a hotelId or planeId to attach' });
+  }
+
+  const existingBooking = await prisma.booking.findFirst({
+    where: {
+      clientMatricula: purchase.clientMatricula,
+      itineraryId: itinerary.id,
+      hotelId: purchase.hotelId || undefined,
+      planeId: purchase.planeId || undefined,
+    },
+  });
+  if (existingBooking) return res.json(existingBooking);
+
+  const booking = await prisma.booking.create({
+    data: {
+      clientMatricula: purchase.clientMatricula,
+      hotelId: purchase.hotelId || null,
+      planeId: purchase.planeId || null,
+      itineraryId: itinerary.id,
+      status: 'CONFIRMED',
+      checkIn: purchase.checkIn,
+      checkOut: purchase.checkOut,
+      totalAmount: purchase.totalAmount,
+    },
+  });
+  res.status(201).json(booking);
 });
 
 // Itineraries
@@ -874,4 +955,38 @@ function tokensForSearch(value) {
   const initials = parts.map((p) => p[0]).join('');
   if (initials) tokens.add(initials);
   return Array.from(tokens);
+}
+
+function normalizeCity(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}
+
+const DESTINATION_ALIASES = {
+  SAO: 'SAOPAULO',
+  GRU: 'SAOPAULO',
+  CGH: 'SAOPAULO',
+  NYC: 'NEWYORK',
+  JFK: 'NEWYORK',
+  LGA: 'NEWYORK',
+  EWR: 'NEWYORK',
+  RIO: 'RIODEJANEIRO',
+  GIG: 'RIODEJANEIRO',
+  SDU: 'RIODEJANEIRO',
+};
+
+function destinationMatchesCity(planeDestination, hotelCity) {
+  if (!planeDestination || !hotelCity) return true;
+  const planeNorm = normalizeCity(planeDestination);
+  const hotelNorm = normalizeCity(hotelCity);
+  const alias = DESTINATION_ALIASES[planeNorm] || planeNorm;
+  if (hotelNorm === alias) return true;
+  if (hotelNorm.includes(alias) || alias.includes(hotelNorm)) return true;
+  // last-resort fuzzy: allow common city names to match common codes
+  const cityTokens = tokensForSearch(hotelCity).map((t) => t.toUpperCase());
+  if (cityTokens.some((t) => alias.includes(t) || t.includes(alias))) return true;
+  return false;
 }
