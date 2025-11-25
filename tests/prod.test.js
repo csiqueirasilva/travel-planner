@@ -2,10 +2,12 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
+const WebSocket = require('ws');
 const OpenAPIClientAxios = require('openapi-client-axios').default;
 require('dotenv').config();
 
 const BASE = process.env.BASE_URL || process.env.BASE_PROD || 'https://leiame.app';
+const WS_BASE = BASE.replace(/^http/, 'ws');
 const STUDENT_TOKEN = process.env.STUDENT_TOKEN || '1234567';
 const OTHER_TOKEN = process.env.OTHER_TOKEN || randomMatricula(); // used for cross-access tests
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
@@ -962,6 +964,7 @@ test('reports clients and top destinations require admin', async () => {
   const studentTop = await api('/reports/top-destinations', { token: STUDENT_TOKEN });
   assert.equal(studentTop.status, 403);
 });
+
 test('admin-only endpoints block student tokens', async () => {
   const adminOnlyOps = [
     { method: 'POST', path: '/hotels', body: { name: 'Hotel Sem Permissao' } },
@@ -981,6 +984,60 @@ test('admin-only endpoints block student tokens', async () => {
 
   const missingAuth = await api('/hotels', { method: 'POST', body: { name: 'Sem Auth' } });
   assert.equal(missingAuth.status, 401, 'admin endpoints should reject missing Authorization header');
+});
+
+test('usage websocket requires admin token', async () => {
+  await new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${WS_BASE}/reports/usage/stream`);
+    const timer = setTimeout(() => {
+      ws.terminate();
+      reject(new Error('ws timeout'));
+    }, 5000);
+    ws.on('close', (code) => {
+      clearTimeout(timer);
+      assert.ok(code === 1008 || code === 1006, `unexpected close code ${code}`);
+      resolve();
+    });
+    ws.on('error', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+});
+
+test('usage websocket streams with admin token', async () => {
+  await new Promise((resolve, reject) => {
+    const ws = new WebSocket(
+      `${WS_BASE}/reports/usage/stream?adminToken=${ADMIN_TOKEN}&client=tests`
+    );
+    let gotMessage = false;
+    const timer = setTimeout(() => {
+      ws.terminate();
+      reject(new Error('ws timeout'));
+    }, 5000);
+    ws.on('message', (data) => {
+      gotMessage = true;
+      clearTimeout(timer);
+      try {
+        const msg = JSON.parse(data);
+        assert.ok(msg.type === 'usage' || msg.type === 'usage:init');
+        ws.close();
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    });
+    ws.on('close', () => {
+      if (!gotMessage) {
+        clearTimeout(timer);
+        reject(new Error('ws closed without messages'));
+      }
+    });
+    ws.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 });
 
 test('split openapi specs stay under 30 operations', () => {

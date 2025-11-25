@@ -20,6 +20,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "openapi-client-axios": "^7.8.0",
+    "ws": "^8.17.1",
     "prisma": "^5.16.2",
     "swagger-ui-express": "^5.0.1"
   },

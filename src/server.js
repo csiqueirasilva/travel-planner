@@ -3,12 +3,16 @@ const express = require('express');
 const swaggerUi = require('swagger-ui-express');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const { WebSocketServer } = require('ws');
 const { PrismaClient, Role } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 const app = express();
+const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
+const WS_PORT = process.env.WS_PORT || 3001;
 
 function loadAdminToken() {
   try {
@@ -27,6 +31,7 @@ const ADMIN_TOKEN = loadAdminToken();
 const openApiPath = path.join(__dirname, 'openapi.json');
 const openApiClientPath = path.join(__dirname, 'openapi-client.json');
 const openApiAdminPath = path.join(__dirname, 'openapi-admin.json');
+const usageSockets = new Set();
 
 app.use((req, res, next) => {
   const origin = req.headers.origin || '*';
@@ -79,13 +84,19 @@ app.use(async (req, res, next) => {
   req.invalidAuthToken = auth.invalid;
   res.on('finish', async () => {
     try {
-      await prisma.usageLog.create({
+      const log = await prisma.usageLog.create({
         data: {
           matricula: req.matricula,
           method: req.method,
           path: req.originalUrl,
           status: res.statusCode,
         },
+      });
+      const payload = JSON.stringify({ type: 'usage', log });
+      usageSockets.forEach((ws) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(payload);
+        }
       });
     } catch (err) {
       // avoid throwing during response finalization
@@ -930,8 +941,33 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
+});
+
+const wss = new WebSocketServer({ port: WS_PORT });
+console.log(`WebSocket server running on port ${WS_PORT}`);
+
+wss.on('connection', async (ws, req) => {
+  const url = new URL(req.url || '', 'http://localhost');
+  const token = url.searchParams.get('adminToken');
+  if (token !== ADMIN_TOKEN) {
+    ws.close(1008, 'Admin token required');
+    return;
+  }
+  usageSockets.add(ws);
+  ws.on('close', () => usageSockets.delete(ws));
+  ws.on('error', () => usageSockets.delete(ws));
+
+  try {
+    const logs = await prisma.usageLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    ws.send(JSON.stringify({ type: 'usage:init', logs: logs.reverse() }));
+  } catch (err) {
+    ws.send(JSON.stringify({ type: 'usage:init', logs: [] }));
+  }
 });
 
 async function ensureUnaccentExtension() {

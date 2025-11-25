@@ -1,15 +1,6 @@
 leiame.app {
   encode gzip
 
-  @options {
-    method OPTIONS
-  }
-  header {
-    Access-Control-Allow-Origin "*"
-    Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    Access-Control-Allow-Headers "*"
-    Access-Control-Expose-Headers "*"
-  }
-
+  reverse_proxy /reports/usage/stream api:3001
   reverse_proxy api:3000
 }
