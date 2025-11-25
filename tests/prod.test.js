@@ -123,6 +123,11 @@ test('planes search and detail', async () => {
   assert.equal(detail.id, p.id);
 });
 
+test('planes search accepts city names with accents and spaces', async () => {
+  const planes = await expectJson('/planes/search?origin=São Paulo&destination=Nova York');
+  assert.ok(planes.length > 0, 'should match flights even when searching by city names');
+});
+
 test('offers today and by date', async () => {
   const today = await expectJson('/offers/today');
   assert.ok(Array.isArray(today));

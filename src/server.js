@@ -4,12 +4,13 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const fs = require('fs');
 const path = require('path');
-const { PrismaClient, Role } = require('@prisma/client');
+const { PrismaClient, Role, Prisma } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+let ensuredUnaccent = false;
 
 function loadAdminToken() {
   try {
@@ -317,16 +318,30 @@ app.delete('/locations/:id', requireAuth, requireAdmin, async (req, res) => {
 // Planes / flights
 async function listPlanes(req, res) {
   const { origin, destination, date } = req.query;
-  const where = {};
-  if (origin) where.origin = { contains: origin, mode: 'insensitive' };
-  if (destination) where.destination = { contains: destination, mode: 'insensitive' };
+  const clauses = [];
+
+  const originClause = buildFlexibleLike('origin', origin);
+  const destinationClause = buildFlexibleLike('destination', destination);
+
+  if (originClause || destinationClause) {
+    await ensureUnaccentExtension();
+  }
+
+  if (originClause) clauses.push(originClause);
+  if (destinationClause) clauses.push(destinationClause);
+
   if (date) {
     const day = new Date(date);
-    const nextDay = new Date(day);
-    nextDay.setDate(day.getDate() + 1);
-    where.departure = { gte: day, lt: nextDay };
+    if (!Number.isNaN(day.getTime())) {
+      const nextDay = new Date(day);
+      nextDay.setDate(day.getDate() + 1);
+      clauses.push(Prisma.sql`"departure" >= ${day} AND "departure" < ${nextDay}`);
+    }
   }
-  const planes = await prisma.plane.findMany({ where, orderBy: { departure: 'asc' } });
+
+  const whereSql = clauses.length ? Prisma.sql`WHERE ${Prisma.join(clauses, Prisma.sql` AND `)}` : Prisma.sql``;
+  const query = Prisma.sql`SELECT * FROM "Plane" ${whereSql} ORDER BY "departure" ASC`;
+  const planes = await prisma.$queryRaw(query);
   res.json(planes);
 }
 
@@ -797,3 +812,38 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
 });
+
+async function ensureUnaccentExtension() {
+  if (ensuredUnaccent) return;
+  try {
+    await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS unaccent`;
+    ensuredUnaccent = true;
+  } catch (err) {
+    console.error('Failed to ensure unaccent extension', err.message);
+  }
+}
+
+function buildFlexibleLike(columnName, value) {
+  if (!value) return null;
+  const safeColumn = columnName === 'origin' ? Prisma.sql`"origin"` : Prisma.sql`"destination"`;
+  const sanitized = String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  if (!sanitized) return null;
+  const tokens = sanitized.split(/\s+/).filter(Boolean);
+  const patterns = new Set();
+  tokens.forEach((t) => patterns.add(`%${t}%`));
+  const noSpaces = tokens.join('');
+  if (noSpaces) {
+    patterns.add(`%${noSpaces}%`);
+    if (noSpaces.length >= 3) patterns.add(`%${noSpaces.slice(0, 3)}%`);
+  }
+  const initials = tokens.map((t) => t[0]).join('');
+  if (initials) patterns.add(`%${initials}%`);
+
+  const clauses = Array.from(patterns).map((p) => Prisma.sql`unaccent(${safeColumn}) ILIKE ${p}`);
+  if (!clauses.length) return null;
+  if (clauses.length === 1) return clauses[0];
+  return Prisma.sql`(${Prisma.join(clauses, Prisma.sql` OR `)})`;
+}
