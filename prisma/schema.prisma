@@ -1,0 +1,158 @@
+// Prisma schema for travel planner API
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+model Location {
+  id          Int       @id @default(autoincrement())
+  name        String
+  city        String
+  state       String?
+  country     String
+  description String?
+  hotels      Hotel[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Hotel {
+  id          Int        @id @default(autoincrement())
+  name        String
+  city        String
+  country     String
+  address     String?
+  price       Int?
+  stars       Int?
+  amenities   String[]
+  location    Location?  @relation(fields: [locationId], references: [id])
+  locationId  Int?
+  roomTypes   RoomType[]
+  reviews     Review[]
+  purchases   Purchase[]
+  bookings    Booking[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model RoomType {
+  id        Int    @id @default(autoincrement())
+  name      String
+  price     Int
+  available Int
+  hotel     Hotel  @relation(fields: [hotelId], references: [id])
+  hotelId   Int
+}
+
+model Plane {
+  id           Int       @id @default(autoincrement())
+  code         String
+  origin       String
+  destination  String
+  departure    DateTime
+  arrival      DateTime
+  price        Int
+  purchases    Purchase[]
+  bookings     Booking[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Client {
+  matricula    String      @id
+  name         String
+  email        String
+  role         Role        @default(STUDENT)
+  active       Boolean     @default(true)
+  purchases    Purchase[]
+  reviews      Review[]
+  bookings     Booking[]
+  itineraries  Itinerary[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Purchase {
+  id              Int       @id @default(autoincrement())
+  client          Client    @relation(fields: [clientMatricula], references: [matricula])
+  clientMatricula String
+  hotel           Hotel?    @relation(fields: [hotelId], references: [id])
+  hotelId         Int?
+  plane           Plane?    @relation(fields: [planeId], references: [id])
+  planeId         Int?
+  checkIn         DateTime?
+  checkOut        DateTime?
+  totalAmount     Int
+  guests          Int?      @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Offer {
+  id              Int       @id @default(autoincrement())
+  title           String
+  description     String?
+  discountPercent Int
+  validUntil      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Booking {
+  id              Int       @id @default(autoincrement())
+  client          Client    @relation(fields: [clientMatricula], references: [matricula])
+  clientMatricula String
+  hotel           Hotel?    @relation(fields: [hotelId], references: [id])
+  hotelId         Int?
+  plane           Plane?    @relation(fields: [planeId], references: [id])
+  planeId         Int?
+  status          String    @default("CONFIRMED")
+  checkIn         DateTime?
+  checkOut        DateTime?
+  totalAmount     Int?
+  itinerary       Itinerary? @relation(fields: [itineraryId], references: [id])
+  itineraryId     Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Itinerary {
+  id              Int       @id @default(autoincrement())
+  name            String
+  client          Client    @relation(fields: [clientMatricula], references: [matricula])
+  clientMatricula String
+  notes           String?
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Review {
+  id              Int       @id @default(autoincrement())
+  hotel           Hotel     @relation(fields: [hotelId], references: [id])
+  hotelId         Int
+  client          Client    @relation(fields: [clientMatricula], references: [matricula])
+  clientMatricula String
+  rating          Int
+  comment         String?
+  createdAt       DateTime  @default(now())
+}
+
+model UsageLog {
+  id        Int      @id @default(autoincrement())
+  matricula String?
+  method    String
+  path      String
+  status    Int
+  createdAt DateTime @default(now())
+}
