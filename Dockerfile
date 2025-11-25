@@ -7,6 +7,7 @@ RUN npm install
 
 COPY prisma ./prisma
 COPY src ./src
+COPY PRIVACY.md ./PRIVACY.md
 
 RUN npx prisma generate
 

@@ -163,16 +163,18 @@ test('client lifecycle with self-access only', async () => {
   const resNoAuth = await api(`/clients/${mat}`);
   assert.equal(resNoAuth.status, 401, 'client endpoints require authentication');
 
-  // another token should be forbidden for read/update/delete
-  const resForbidden = await api(`/clients/${mat}`, { token: STUDENT_TOKEN });
-  assert.equal(resForbidden.status, 403, 'accessing another matricula should be forbidden');
+  // another token can read/update; delete remains restricted
+  const resOther = await expectJson(`/clients/${mat}`, { token: STUDENT_TOKEN });
+  assert.equal(resOther.matricula, mat);
 
   const resUpdateForbidden = await api(`/clients/${mat}`, {
     method: 'PUT',
     token: STUDENT_TOKEN,
-    body: { name: 'Intruder' },
+    body: { name: 'Updated By Other', email: `other${mat}@example.com` },
   });
-  assert.equal(resUpdateForbidden.status, 403, 'updating another matricula should be forbidden');
+  assert.equal(resUpdateForbidden.status, 200, 'updating another matricula should be allowed');
+  const updated = await expectJson(`/clients/${mat}`, { token: STUDENT_TOKEN });
+  assert.equal(updated.name, 'Updated By Other');
 
   const resDeleteForbidden = await api(`/clients/${mat}`, { method: 'DELETE', token: STUDENT_TOKEN });
   assert.equal(resDeleteForbidden.status, 403, 'deleting another matricula should be forbidden');

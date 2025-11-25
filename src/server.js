@@ -475,7 +475,6 @@ app.post('/clients', requireAuth, async (req, res) => {
 
 app.get('/clients/:matricula', requireAuth, async (req, res) => {
   const { matricula } = req.params;
-  if (!ensureSelfOrAdmin(req, res, matricula)) return;
   const client = await prisma.client.findUnique({ where: { matricula } });
   if (!client) return res.status(404).json({ error: 'Client not found' });
   res.json(client);
@@ -483,7 +482,6 @@ app.get('/clients/:matricula', requireAuth, async (req, res) => {
 
 app.put('/clients/:matricula', requireAuth, async (req, res) => {
   const { matricula } = req.params;
-  if (!ensureSelfOrAdmin(req, res, matricula)) return;
   const payload = pickClientPayload(req.body);
   try {
     const client = await prisma.client.update({
