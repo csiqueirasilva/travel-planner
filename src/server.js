@@ -37,14 +37,20 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 
 function parseAuth(header) {
-  if (!header) return { token: null, matricula: null, isAdminToken: false };
+  if (!header) return { token: null, matricula: null, isAdminToken: false, invalid: false };
   const token = header.replace(/Bearer\s+/i, '').trim();
   const isAdminToken = token === ADMIN_TOKEN;
   const matricula = /^[0-9]{7}$/.test(token) ? token : null;
-  return { token, matricula, isAdminToken };
+  const invalid = !isAdminToken && !matricula;
+  return { token, matricula, isAdminToken, invalid };
 }
 
 function requireAuth(req, res, next) {
+  if (req.invalidAuthToken) {
+    return res
+      .status(401)
+      .json({ error: 'Authorization header inválido: use matrícula de 7 dígitos ou token de admin' });
+  }
   if (!req.matricula && !req.isAdmin) {
     return res
       .status(401)
@@ -64,6 +70,7 @@ app.use(async (req, res, next) => {
   const auth = parseAuth(req.header('authorization'));
   req.matricula = auth.matricula || (auth.isAdminToken ? 'admin' : null);
   req.isAdmin = auth.isAdminToken;
+  req.invalidAuthToken = auth.invalid;
   res.on('finish', async () => {
     try {
       await prisma.usageLog.create({

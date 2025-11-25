@@ -1,7 +1,7 @@
 # Tarefas a serem executadas (PT-BR)
 
-1) **Criar seu cadastro**  
-   Cadastre-se com sua matrícula, nome e e-mail. Depois, confira se o cadastro aparece ao consultar seu próprio registro.
+1) **Criar seu cadastro (cliente)**  
+   Cadastre um cliente com sua matrícula (7 dígitos), nome e e-mail. Depois, confira se o cadastro aparece ao consultar seu próprio registro.
 
 2) **Explorar destinos e hotéis**  
    Veja as cidades/regiões disponíveis e liste os hotéis de uma delas. Use filtros de preço, estrelas ou amenidades, se quiser.
