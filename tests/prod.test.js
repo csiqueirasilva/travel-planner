@@ -72,6 +72,14 @@ test('auth login echoes bearer token', async () => {
   assert.ok(typeof res.bearer === 'string' && res.bearer.includes(mat));
 });
 
+test('auth login rejects invalid matricula format', async () => {
+  const res = await api('/auth/login', {
+    method: 'POST',
+    body: { matricula: 'abc' },
+  });
+  assert.equal(res.status, 400);
+});
+
 test('locations and hotels are available with filters', async () => {
   const locations = await expectJson('/locations');
   assert.ok(Array.isArray(locations) && locations.length > 0, 'locations list should not be empty');
@@ -196,6 +204,9 @@ test('purchases respect ownership; create, update, delete', async () => {
   const created = await expectJson('/purchases', { method: 'POST', token: STUDENT_TOKEN, body: purchaseBody }, 201);
   assert.ok(created.id);
 
+  const fetched = await expectJson(`/purchases/${created.id}`, { token: STUDENT_TOKEN });
+  assert.equal(fetched.id, created.id);
+
   const resNoAuth = await api(`/purchases/${created.id}`);
   assert.equal(resNoAuth.status, 401, 'purchase read requires auth');
 
@@ -285,24 +296,33 @@ test('admin CRUD for locations, hotels, planes and sales report', async () => {
 });
 
 test('itinerary with booking linkage and cleanup', async () => {
-  await ensureClientExists(STUDENT_TOKEN);
+  const mat = randomMatricula();
+  await ensureClientExists(mat);
   await ensureClientExists(OTHER_TOKEN);
 
-  const itinerary = await expectJson('/itineraries', {
-    method: 'POST',
-    token: STUDENT_TOKEN,
-    body: { name: 'Teste Itinerário', notes: 'Anotar passeios' },
-  }, 201);
+  const itinerary = await expectJson(
+    '/itineraries',
+    {
+      method: 'POST',
+      token: mat,
+      body: { name: 'Teste Itinerário', notes: 'Anotar passeios' },
+    },
+    201
+  );
   assert.ok(itinerary.id);
 
-  const booking = await expectJson('/bookings', {
-    method: 'POST',
-    token: STUDENT_TOKEN,
-    body: { clientMatricula: STUDENT_TOKEN, hotelId: 1, itineraryId: itinerary.id, totalAmount: 500 },
-  }, 201);
+  const booking = await expectJson(
+    '/bookings',
+    {
+      method: 'POST',
+      token: mat,
+      body: { clientMatricula: mat, hotelId: 1, itineraryId: itinerary.id, totalAmount: 500 },
+    },
+    201
+  );
   assert.ok(booking.id);
 
-  const itData = await expectJson(`/itineraries/${itinerary.id}`, { token: STUDENT_TOKEN });
+  const itData = await expectJson(`/itineraries/${itinerary.id}`, { token: mat });
   assert.ok(Array.isArray(itData.bookings));
 
   const itNoAuth = await api(`/itineraries/${itinerary.id}`);
@@ -310,6 +330,16 @@ test('itinerary with booking linkage and cleanup', async () => {
 
   const itForbidden = await api(`/itineraries/${itinerary.id}`, { token: OTHER_TOKEN });
   assert.equal(itForbidden.status, 403, 'other user should not read itinerary');
+
+  const updatedItinerary = await expectJson(
+    `/itineraries/${itinerary.id}`,
+    {
+      method: 'PUT',
+      token: mat,
+      body: { name: 'Itinerário Atualizado', notes: 'Notas novas' },
+    }
+  );
+  assert.equal(updatedItinerary.name, 'Itinerário Atualizado');
 
   const itDeleteForbidden = await api(`/itineraries/${itinerary.id}`, {
     method: 'DELETE',
@@ -336,7 +366,7 @@ test('itinerary with booking linkage and cleanup', async () => {
   const bookingCrossCreate = await api('/bookings', {
     method: 'POST',
     token: OTHER_TOKEN,
-    body: { clientMatricula: STUDENT_TOKEN, hotelId: 1, totalAmount: 123 },
+    body: { clientMatricula: mat, hotelId: 1, totalAmount: 123 },
   });
   assert.equal(bookingCrossCreate.status, 403, 'cannot create booking for another matricula');
 
@@ -344,8 +374,8 @@ test('itinerary with booking linkage and cleanup', async () => {
   assert.equal(bookingNoAuth.status, 401, 'booking read requires auth');
 
   // cleanup booking and itinerary
-  await expectJson(`/bookings/${booking.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
-  await expectJson(`/itineraries/${itinerary.id}`, { method: 'DELETE', token: STUDENT_TOKEN });
+  await expectJson(`/bookings/${booking.id}`, { method: 'DELETE', token: mat });
+  await expectJson(`/itineraries/${itinerary.id}`, { method: 'DELETE', token: mat });
 });
 
 test('reviews can be posted and listed', async () => {

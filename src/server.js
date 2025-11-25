@@ -658,6 +658,18 @@ app.get('/itineraries/:id', requireAuth, async (req, res) => {
   res.json(itinerary);
 });
 
+app.put('/itineraries/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const itinerary = await prisma.itinerary.findUnique({ where: { id } });
+  if (!itinerary) return res.status(404).json({ error: 'Itinerary not found' });
+  if (!ensureSelfOrAdmin(req, res, itinerary.clientMatricula)) return;
+  const updated = await prisma.itinerary.update({
+    where: { id },
+    data: { name: req.body.name, notes: req.body.notes },
+  });
+  res.json(updated);
+});
+
 app.delete('/itineraries/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const itinerary = await prisma.itinerary.findUnique({ where: { id } });
