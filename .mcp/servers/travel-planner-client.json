@@ -1,0 +1,19 @@
+{
+  "command": "npx",
+  "args": [
+    "-y",
+    "mcp-openapi",
+    "serve",
+    "--spec",
+    "src/openapi-client.json",
+    "--name",
+    "travel-planner-client",
+    "--base-url",
+    "https://leiame.app",
+    "--header",
+    "Authorization: ${API_KEY}"
+  ],
+  "env": {
+    "API_KEY": "1234567"
+  }
+}
