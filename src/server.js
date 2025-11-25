@@ -88,7 +88,12 @@ app.get('/openapi.json', (req, res) => res.sendFile(openApiPath));
 app.use(
   '/docs',
   swaggerUi.serve,
-  swaggerUi.setup(null, { explorer: true, swaggerUrl: '/openapi.json' })
+  swaggerUi.setup(null, {
+    explorer: true,
+    swaggerOptions: {
+      url: '/openapi.json',
+    },
+  })
 );
 
 function ensureSelfOrAdmin(req, res, targetMatricula) {
