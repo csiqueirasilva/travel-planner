@@ -22,10 +22,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/travel_planner
-      PORT: 3000
-      ADMIN_MATRICULAS: 0000001,1111111
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/travel_planner}
+      PORT: ${PORT:-3000}
+      ADMIN_MATRICULAS: ${ADMIN_MATRICULAS:-0000001,1111111}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-admin-secret-token}
     ports:
       - "3000:3000"
 

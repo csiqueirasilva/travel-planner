@@ -4,7 +4,8 @@ Express + Prisma API for a classroom travel booking exercise. It exposes CRUD an
 
 ## Quickstart (Docker)
 1. Copy `.env.example` to `.env` (defaults assume docker-compose):  
-   `cp .env.example .env`
+   `cp .env.example .env`  
+   Then set `ADMIN_TOKEN` (UUID-style string) and adjust `ADMIN_MATRICULAS` (comma-separated 7-digit matriculas) if you want different admins.
 2. Build and start:  
    `docker-compose up --build -d`
 3. Run database migrations and seed sample data:  
@@ -22,8 +23,8 @@ npm run dev
 ```
 
 ## Auth
-- Send `Authorization: 1234567` (7 digits) for student requests. For admin-only routes, send the admin token configured in `config/admin.json`.
-- Config: copy `config/admin.example.json` to `config/admin.json` and set a strong `adminToken` (this file is git-ignored). You can also set `ADMIN_TOKEN` env as a fallback.
+- Send `Authorization: 1234567` (7 digits) for student requests. For admin-only routes, send the admin token configured via `ADMIN_TOKEN` in `.env` or `config/admin.json`.
+- Config: copy `config/admin.example.json` to `config/admin.json` and set a strong `adminToken` (this file is git-ignored). The server also reads `ADMIN_MATRICULAS` from env for legacy admin matriculas and falls back to `ADMIN_TOKEN` for admin access.
 - Sample seed users: admin matricula `0000001`, student `1234567` (student rights); admin token overrides role checks.
 
 ## Endpoints (high level)
