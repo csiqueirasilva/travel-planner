@@ -709,6 +709,7 @@ app.post('/bookings', requireAuth, async (req, res) => {
       checkIn: dateValidation.checkIn,
       checkOut: dateValidation.checkOut,
       totalAmount: amount,
+      createdBy: req.matricula || (req.isAdmin ? 'admin' : 'unknown'),
     },
   });
   res.status(201).json(booking);
@@ -720,7 +721,7 @@ app.get('/bookings/:id', requireAuth, async (req, res) => {
     where: { id },
   });
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
-  if (!ensureSelfOrAdmin(req, res, booking.clientMatricula)) return;
+  if (!canAccessBooking(req, res, booking)) return;
   res.json(booking);
 });
 
@@ -728,7 +729,7 @@ app.put('/bookings/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.booking.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Booking not found' });
-  if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
+  if (!canAccessBooking(req, res, existing)) return;
   const amount = parseAmount(req.body.totalAmount);
   if (amount === null) return res.status(400).json({ error: 'totalAmount must be a number' });
   const dateValidation = validateDateRange(req.body.checkIn, req.body.checkOut);
@@ -761,7 +762,7 @@ app.delete('/bookings/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.booking.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Booking not found' });
-  if (!ensureSelfOrAdmin(req, res, existing.clientMatricula)) return;
+  if (!canAccessBooking(req, res, existing)) return;
   await prisma.booking.delete({ where: { id } });
   res.json({ deleted: true });
 });
@@ -802,6 +803,7 @@ app.post('/purchases/:id/attach-itinerary', requireAuth, async (req, res) => {
       checkIn: purchase.checkIn,
       checkOut: purchase.checkOut,
       totalAmount: purchase.totalAmount,
+      createdBy: req.matricula || (req.isAdmin ? 'admin' : 'unknown'),
     },
   });
   res.status(201).json(booking);
@@ -1102,4 +1104,8 @@ function canAccessResource(req, res, targetMatricula, createdBy, resourceName = 
 
 function canAccessPurchase(req, res, purchase) {
   return canAccessResource(req, res, purchase.clientMatricula, purchase.createdBy, 'purchase');
+}
+
+function canAccessBooking(req, res, booking) {
+  return canAccessResource(req, res, booking.clientMatricula, booking.createdBy, 'booking');
 }
